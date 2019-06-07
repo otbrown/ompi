@@ -24,7 +24,7 @@
 #include "opal/util/bit_ops.h"
 #include "ompi/op/op.h"
 
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 static inline int red_sched_binomial (int rank, int p, int root, const void *sendbuf, void *redbuf, char tmpredbuf, int count, MPI_Datatype datatype,
                                       MPI_Op op, char inplace, NBC_Schedule *schedule, void *tmpbuf);

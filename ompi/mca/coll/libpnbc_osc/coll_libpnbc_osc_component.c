@@ -28,8 +28,8 @@
 
 #include "ompi_config.h"
 
-#include "coll_libnbc.h"
-#include "nbc_internal.h"
+#include "coll_libpnbc_osc.h"
+#include "pnbc_osc_internal.h"
 
 #include "mpi.h"
 #include "ompi/mca/coll/coll.h"

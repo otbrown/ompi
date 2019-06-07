@@ -21,7 +21,7 @@
  * Author(s): Torsten Hoefler <htor@cs.indiana.edu>
  *
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 #ifdef NBC_CACHE_SCHEDULE
 /* tree comparison function for schedule cache */

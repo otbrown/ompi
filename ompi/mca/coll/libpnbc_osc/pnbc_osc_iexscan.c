@@ -21,7 +21,7 @@
 #include "opal/align.h"
 #include "ompi/op/op.h"
 
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 static inline int exscan_sched_linear(
     int rank, int comm_size, const void *sendbuf, void *recvbuf, int count,

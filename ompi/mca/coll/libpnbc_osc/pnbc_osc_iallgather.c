@@ -18,7 +18,7 @@
  * Author(s): Torsten Hoefler <htor@cs.indiana.edu>
  *
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 static inline int allgather_sched_linear(
     int rank, int comm_size, NBC_Schedule *schedule, const void *sendbuf,
