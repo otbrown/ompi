@@ -12,7 +12,7 @@
  *
  */
 
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 #include "ompi/mca/topo/base/base.h"
 
 int NBC_Comm_neighbors_count (ompi_communicator_t *comm, int *indegree, int *outdegree) {

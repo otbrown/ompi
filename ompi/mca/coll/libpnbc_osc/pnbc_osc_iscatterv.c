@@ -21,7 +21,7 @@
  * Author(s): Torsten Hoefler <htor@cs.indiana.edu>
  *
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 /* a scatterv schedule can not be cached easily because the contents
  * ot the recvcounts array may change, so a comparison of the address

@@ -18,7 +18,7 @@
  * Author(s): Torsten Hoefler <htor@cs.indiana.edu>
  *
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 /* cannot cache schedules because one cannot check locally if the pattern is the same!! */
 #undef NBC_CACHE_SCHEDULE

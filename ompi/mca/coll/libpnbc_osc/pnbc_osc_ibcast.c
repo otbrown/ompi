@@ -18,7 +18,7 @@
  * Author(s): Torsten Hoefler <htor@cs.indiana.edu>
  *
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 static inline int bcast_sched_binomial(int rank, int p, int root, NBC_Schedule *schedule, void *buffer, int count,
                                        MPI_Datatype datatype);

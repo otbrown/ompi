@@ -23,7 +23,7 @@
  */
 #include "opal/align.h"
 
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 /* an reduce_csttare schedule can not be cached easily because the contents
  * ot the recvcounts array may change, so a comparison of the address

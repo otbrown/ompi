@@ -20,7 +20,7 @@
  * Additional copyrights may follow
  *
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 /* an allgatherv schedule can not be cached easily because the contents
  * ot the recvcounts array may change, so a comparison of the address

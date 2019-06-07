@@ -24,7 +24,7 @@
  *
  * Additional copyrights may follow
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 #include "ompi/mca/coll/base/coll_tags.h"
 #include "ompi/op/op.h"
 #include "ompi/mca/pml/pml.h"

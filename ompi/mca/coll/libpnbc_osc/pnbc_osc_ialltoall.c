@@ -19,7 +19,7 @@
  * Author(s): Torsten Hoefler <htor@cs.indiana.edu>
  *
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 static inline int a2a_sched_linear(int rank, int p, MPI_Aint sndext, MPI_Aint rcvext, NBC_Schedule *schedule,
                                    const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf,

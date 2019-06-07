@@ -19,7 +19,7 @@
  * Author(s): Torsten Hoefler <htor@cs.indiana.edu>
  *
  */
-#include "nbc_internal.h"
+#include "pnbc_osc_internal.h"
 
 /* Dissemination implementation of MPI_Ibarrier */
 static int nbc_barrier_init(struct ompi_communicator_t *comm, ompi_request_t ** request,
