@@ -28,7 +28,8 @@
 #include "ompi/mca/coll/base/coll_tags.h"
 #include "ompi/op/op.h"
 #include "ompi/mca/pml/pml.h"
-
+#include "ompi/win/win.h"
+#include "ompi/mca/osc/osc.h"
 /* only used in this file */
 static inline int NBC_Start_round(NBC_Handle *handle);
 
@@ -168,7 +169,7 @@ static int NBC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datat
   if (OMPI_SUCCESS != ret) {
     return ret;
   }
-
+ 
   NBC_DEBUG(10, "added receive - ends at byte %d\n", nbc_schedule_get_size (schedule));
 
   return OMPI_SUCCESS;
