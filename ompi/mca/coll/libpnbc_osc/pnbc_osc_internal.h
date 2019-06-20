@@ -146,6 +146,9 @@ typedef struct {
 
 /* internal function prototypes */
 int NBC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier);
+int NBC_Sched_put (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier);
+int NBC_Sched_get (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier);
+
 int NBC_Sched_local_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,NBC_Schedule *schedule, bool barrier);
 int NBC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier);
 int NBC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier);
@@ -157,6 +160,7 @@ int NBC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype dataty
                       NBC_Schedule *schedule, bool barrier);
 
 int NBC_Sched_barrier (NBC_Schedule *schedule);
+int NBC_Sched_fence  (NBC_Schedule *schedule);
 int NBC_Sched_commit (NBC_Schedule *schedule);
 
 #ifdef NBC_CACHE_SCHEDULE
