@@ -83,7 +83,9 @@ typedef enum {
   RECV,
   OP,
   COPY,
-  UNPACK
+  UNPACK,
+  PUT,
+  GET
 } NBC_Fn_type;
 
 /* the send argument struct */

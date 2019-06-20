@@ -118,7 +118,7 @@ static int nbc_schedule_round_append (NBC_Schedule *schedule, void *data, int da
 }
 
 
-/* this function puts a send into the schedule */
+/* this function puts a put into the schedule */
 static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, bool local, NBC_Schedule *schedule, bool barrier) {
   NBC_Args_send send_args;
   int ret;
