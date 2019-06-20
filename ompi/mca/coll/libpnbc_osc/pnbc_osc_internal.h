@@ -88,6 +88,17 @@ typedef enum {
   GET
 } NBC_Fn_type;
 
+/* the put argument struct */
+typedef struct {
+  NBC_Fn_type type;
+  int count;
+  const void *buf;
+  MPI_Datatype datatype;
+  int dest;
+  char tmpbuf;
+  bool local;
+} NBC_Args_put;
+
 /* the send argument struct */
 typedef struct {
   NBC_Fn_type type;
