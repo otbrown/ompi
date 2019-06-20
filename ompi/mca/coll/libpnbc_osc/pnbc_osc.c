@@ -120,25 +120,25 @@ static int nbc_schedule_round_append (NBC_Schedule *schedule, void *data, int da
 
 /* this function puts a put into the schedule */
 static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, bool local, NBC_Schedule *schedule, bool barrier) {
-  NBC_Args_send send_args;
+  NBC_Args_put put_args;
   int ret;
 
   /* store the passed arguments */
-  send_args.type = PUT;
-  send_args.buf = buf;
-  send_args.tmpbuf = tmpbuf;
-  send_args.count = count;
-  send_args.datatype = datatype;
-  send_args.dest = dest;
-  send_args.local = local;
+  put_args.type = PUT;
+  put_args.buf = buf;
+  put_args.tmpbuf = tmpbuf;
+  put_args.count = count;
+  put_args.datatype = datatype;
+  put_args.dest = dest;
+  put_args.local = local;
 
   /* append to the round-schedule */
-  ret = nbc_schedule_round_append (schedule, &send_args, sizeof (send_args), barrier);
+  ret = nbc_schedule_round_append (schedule, &put_args, sizeof (put_args), barrier);
   if (OMPI_SUCCESS != ret) {
     return ret;
   }
 
-  NBC_DEBUG(10, "added send - ends at byte %i\n", nbc_schedule_get_size (schedule));
+  NBC_DEBUG(10, "added put - ends at byte %i\n", nbc_schedule_get_size (schedule));
 
   return OMPI_SUCCESS;
 }
