@@ -98,7 +98,18 @@ typedef struct {
   char tmpbuf;
   bool local;
 } NBC_Args_put;
-
+  
+/* the get argument struct */
+typedef struct {
+  NBC_Fn_type type;
+  int count;
+  void *buf;
+  MPI_Datatype datatype;
+  char tmpbuf;
+  int source;
+  bool local;
+} NBC_Args_get;
+  
 /* the send argument struct */
 typedef struct {
   NBC_Fn_type type;
