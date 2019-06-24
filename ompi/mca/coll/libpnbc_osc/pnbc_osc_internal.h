@@ -331,6 +331,14 @@ static inline void nbc_get_round_size (char *p, unsigned long *size) {
   for (int i = 0 ; i < num ; ++i) {
     memcpy (&type, p + offset, sizeof (type));
     switch(type) {
+    case PUT:
+       /*printf("found a PUT at offset %li\n", (long)p-(long)schedule); */
+      offset += sizeof(NBC_Args_put);
+      break;
+    case GET:
+      /*printf("found a GET at offset %li\n", (long)p-(long)schedule); */
+      offset += sizeof(NBC_Args_get);
+      break; 
     case SEND:
       /*printf("found a SEND at offset %li\n", (long)p-(long)schedule); */
       offset += sizeof(NBC_Args_send);
