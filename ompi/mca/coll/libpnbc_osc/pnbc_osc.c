@@ -471,6 +471,9 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
 
     memcpy (&type, ptr, sizeof (type));
     switch(type) {
+      case PUT:
+        //TODO
+        break;
       case SEND:
         NBC_DEBUG(5,"  SEND (offset %li) ", offset);
         NBC_GET_BYTES(ptr,sendargs);
