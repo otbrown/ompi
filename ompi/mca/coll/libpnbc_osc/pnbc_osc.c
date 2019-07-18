@@ -36,9 +36,9 @@ static inline int NBC_Start_round(NBC_Handle *handle);
 /* #define NBC_TIMING */
 
 #ifdef NBC_TIMING
-static double Isend_time=0, Irecv_time=0, Wait_time=0, Test_time=0;
+static double Iput_time=0,Isend_time=0, Irecv_time=0, Wait_time=0, Test_time=0;
 void NBC_Reset_times() {
-  Isend_time=Irecv_time=Wait_time=Test_time=0;
+  Iput_time=Isend_time=Irecv_time=Wait_time=Test_time=0;
 }
 void NBC_Print_times(double div) {
   printf("*** NBC_TIMES: Isend: %lf, Irecv: %lf, Wait: %lf, Test: %lf\n", Isend_time*1e6/div, Irecv_time*1e6/div, Wait_time*1e6/div, Test_time*1e6/div);
@@ -453,6 +453,7 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
   char* ptr;
   MPI_Request *tmp;
   NBC_Fn_type type;
+  NBC_Args_put     putargs;
   NBC_Args_send     sendargs;
   NBC_Args_recv     recvargs;
   NBC_Args_op         opargs;
@@ -471,8 +472,40 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
 
     memcpy (&type, ptr, sizeof (type));
     switch(type) {
+      //TODO
       case PUT:
-        //TODO
+        NBC_DEBUG(5,"  PUT (offset %li) ", offset);
+        NBC_GET_BYTES(ptr,putargs);
+        NBC_DEBUG(5,"*buf: %p, count: %i, type: %p, dest: %i, tag: %i)\n", putargs.buf,
+                  putargs.count, putargs.datatype, putargs.dest, handle->tag);
+        /* get an additional request */
+        handle->req_count++;
+        /* get buffer */
+        /* if(sendargs.tmpbuf) { */
+        /*   buf1=(char*)handle->tmpbuf+(long)sendargs.buf; */
+        /* } else { */
+        /*   buf1=(void *)sendargs.buf; */
+        /* } */
+#ifdef NBC_TIMING
+        Iput_time -= MPI_Wtime();
+#endif
+        tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
+        if (NULL == tmp) {
+          return OMPI_ERR_OUT_OF_RESOURCE;
+        }
+        
+        handle->req_array = tmp;
+
+        /* res = MCA_PML_CALL(isend(buf1, sendargs.count, sendargs.datatype, sendargs.dest, handle->tag, */
+        /*                          MCA_PML_BASE_SEND_STANDARD, sendargs.local?handle->comm->c_local_comm:handle->comm, handle->req_array+handle->req_count - 1)); */
+
+        if (OMPI_SUCCESS != res) {
+          NBC_Error ("Error in MPI_Iput(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, putargs.count, sendargs.datatype, sendargs.dest, handle->tag, (unsigned long)handle->comm, res);
+          return res;
+        }
+#ifdef NBC_TIMING
+        Iput_time += MPI_Wtime();
+#endif
         break;
       case SEND:
         NBC_DEBUG(5,"  SEND (offset %li) ", offset);
