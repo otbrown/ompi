@@ -126,6 +126,7 @@ static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int count, MPI_
   /* store the passed arguments */
   put_args.type = PUT;
   put_args.buf = buf;
+  /*TODO: most likely we don't need this for single sided*/
   put_args.tmpbuf = tmpbuf;
   put_args.count = count;
   put_args.datatype = datatype;
@@ -144,6 +145,7 @@ static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int count, MPI_
 }
 
 int NBC_Sched_put (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier) {
+  NBC_Sched_put_internal (buf, tmpbuf, count, datatype, dest, false, schedule, barrier);
 }
 
 int NBC_Sched_get (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier) {
