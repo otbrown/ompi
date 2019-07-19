@@ -145,11 +145,38 @@ static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int count, MPI_
 }
 
 int NBC_Sched_put (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier) {
-  NBC_Sched_put_internal (buf, tmpbuf, count, datatype, dest, false, schedule, barrier);
+  return NBC_Sched_put_internal (buf, tmpbuf, count, datatype, dest, false, schedule, barrier);
 }
 
-int NBC_Sched_get (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier) {
-  
+
+/* this function puts a get into the schedule */
+static int NBC_Sched_get_internal (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, bool local, NBC_Schedule *schedule, bool barrier) {
+  NBC_Args_get get_args;
+  int ret;
+
+  /* store the passed arguments */
+  get_args.type = GET;
+  get_args.buf = buf;
+  /*TODO: most likely we don't need this for single sided*/
+  get_args.tmpbuf = tmpbuf;
+  get_args.count = count;
+  get_args.datatype = datatype;
+  get_args.source = source;
+  get_args.local = local;
+
+  /* append to the round-schedule */
+  ret = nbc_schedule_round_append (schedule, &get_args, sizeof (get_args), barrier);
+  if (OMPI_SUCCESS != ret) {
+    return ret;
+  }
+
+  NBC_DEBUG(10, "added get - ends at byte %i\n", nbc_schedule_get_size (schedule));
+
+  return OMPI_SUCCESS;
+}
+
+int NBC_Sched_get (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
+  return NBC_Sched_get_internal (buf, tmpbuf, count, datatype, source, false, schedule, barrier);
 }
 
 /* this function puts a send into the schedule */
