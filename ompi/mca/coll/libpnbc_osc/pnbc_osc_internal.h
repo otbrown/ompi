@@ -103,7 +103,7 @@ typedef struct {
 typedef struct {
   NBC_Fn_type type;
   int count;
-  void *buf;
+  const void *buf;
   MPI_Datatype datatype;
   char tmpbuf;
   int source;
