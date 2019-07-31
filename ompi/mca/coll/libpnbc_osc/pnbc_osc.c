@@ -523,9 +523,9 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         }
         
         handle->req_array = tmp;
-        res = win->w_osc_module->osc_put(buf1, putargs.count, putargs.datatype,
+        res = handle->win->w_osc_module->osc_put(buf1, putargs.count, putargs.datatype,
                                          putargs.dest, 0, putargs.count,
-                                         putargs.datatype, win);
+                                         putargs.datatype, handle->win);
 
         if (OMPI_SUCCESS != res) {
           NBC_Error ("Error in MPI_Iput(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, putargs.count, putargs.datatype, putargs.dest, handle->tag, (unsigned long)handle->comm, res);
@@ -558,9 +558,9 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         
         handle->req_array = tmp;
 
-        res = win->w_osc_module->osc_get(buf1, getargs.count, getargs.datatype,
+        res = handle->win->w_osc_module->osc_get(buf1, getargs.count, getargs.datatype,
                                          getargs.source, 0, getargs.count,
-                                         getargs.datatype, win);
+                                         getargs.datatype, handle->win);
 
         if (OMPI_SUCCESS != res) {
           NBC_Error ("Error in MPI_Iget(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, 
