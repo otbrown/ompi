@@ -509,11 +509,11 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         /* get an additional request */
         handle->req_count++;
         /* get buffer */
-        /* if(sendargs.tmpbuf) { */
-        /*   buf1=(char*)handle->tmpbuf+(long)sendargs.buf; */
-        /* } else { */
-        /*   buf1=(void *)sendargs.buf; */
-        /* } */
+        if(sendargs.tmpbuf) {
+          buf1=(char*)handle->tmpbuf+(long)sendargs.buf;
+        } else {
+          buf1=(void *)sendargs.buf;
+        }
 #ifdef NBC_TIMING
         Iput_time -= MPI_Wtime();
 #endif
@@ -543,14 +543,15 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         /* get an additional request */
         handle->req_count++;
         /* get buffer */
-        /* if(sendargs.tmpbuf) { */
-        /*   buf1=(char*)handle->tmpbuf+(long)sendargs.buf; */
-        /* } else { */
-        /*   buf1=(void *)sendargs.buf; */
-        /* } */
+        if(sendargs.tmpbuf) {
+          buf1=(char*)handle->tmpbuf+(long)sendargs.buf;
+        } else {
+          buf1=(void *)sendargs.buf;
+        }
 #ifdef NBC_TIMING
         Iget_time -= MPI_Wtime();
 #endif
+        //TODO: I am not too sure we need to realloc for PUT/GET - Not used
         tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
         if (NULL == tmp) {
           return OMPI_ERR_OUT_OF_RESOURCE;
