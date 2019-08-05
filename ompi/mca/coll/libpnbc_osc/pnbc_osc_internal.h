@@ -37,6 +37,7 @@
 #include "ompi/request/request.h"
 #include "ompi/datatype/ompi_datatype.h"
 #include "ompi/communicator/communicator.h"
+#include "ompi/win/win.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -293,6 +294,9 @@ int NBC_Start(NBC_Handle *handle);
 int NBC_Schedule_request(NBC_Schedule *schedule, ompi_communicator_t *comm,
                          ompi_coll_libnbc_module_t *module, bool persistent,
                          ompi_request_t **request, void *tmpbuf);
+int NBC_Schedule_request_win(NBC_Schedule *schedule, ompi_communicator_t *comm,
+                             ompi_win_t *win, ompi_coll_libnbc_module_t *module,
+                             bool persistent, ompi_request_t **request, void *tmpbuf);
 void NBC_Return_handle(ompi_coll_libnbc_request_t *request);
 static inline int NBC_Type_intrinsic(MPI_Datatype type);
 int NBC_Create_fortran_handle(int *fhandle, NBC_Handle **handle);

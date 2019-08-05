@@ -889,6 +889,89 @@ int NBC_Schedule_request(NBC_Schedule *schedule, ompi_communicator_t *comm,
   return OMPI_SUCCESS;
 }
 
+int NBC_Schedule_request_win(NBC_Schedule *schedule, ompi_communicator_t *comm,
+                             ompi_win_t *win, ompi_coll_libnbc_module_t *module,
+                             bool persistent, ompi_request_t **request, void *tmpbuf) {
+  int ret, tmp_tag;
+  bool need_register = false;
+  ompi_coll_libnbc_request_t *handle;
+
+  /* no operation (e.g. one process barrier)? */
+  if (((int *)schedule->data)[0] == 0 && schedule->data[sizeof(int)] == 0) {
+    ret = nbc_get_noop_request(persistent, request);
+    if (OMPI_SUCCESS != ret) {
+      return OMPI_ERR_OUT_OF_RESOURCE;
+    }
+
+    /* update the module->tag here because other processes may have operations
+     * and they may update the module->tag */
+    OPAL_THREAD_LOCK(&module->mutex);
+    tmp_tag = module->tag--;
+    if (tmp_tag == MCA_COLL_BASE_TAG_NONBLOCKING_END) {
+      tmp_tag = module->tag = MCA_COLL_BASE_TAG_NONBLOCKING_BASE;
+      NBC_DEBUG(2,"resetting tags ...\n");
+    }
+    OPAL_THREAD_UNLOCK(&module->mutex);
+
+    OBJ_RELEASE(schedule);
+    free(tmpbuf);
+
+    return OMPI_SUCCESS;
+  }
+
+  OMPI_COLL_LIBNBC_REQUEST_ALLOC(comm, persistent, handle);
+  if (NULL == handle) return OMPI_ERR_OUT_OF_RESOURCE;
+
+  handle->tmpbuf = NULL;
+  handle->req_count = 0;
+  handle->req_array = NULL;
+  handle->comm = comm;
+  handle->schedule = NULL;
+  handle->row_offset = 0;
+  handle->nbc_complete = persistent ? true : false;
+  handle->win = win;
+
+  /******************** Do the tag and shadow comm administration ...  ***************/
+
+  OPAL_THREAD_LOCK(&module->mutex);
+  tmp_tag = module->tag--;
+  if (tmp_tag == MCA_COLL_BASE_TAG_NONBLOCKING_END) {
+      tmp_tag = module->tag = MCA_COLL_BASE_TAG_NONBLOCKING_BASE;
+      NBC_DEBUG(2,"resetting tags ...\n");
+  }
+
+  if (true != module->comm_registered) {
+      module->comm_registered = true;
+      need_register = true;
+  }
+  OPAL_THREAD_UNLOCK(&module->mutex);
+
+  handle->tag = tmp_tag;
+
+  /* register progress */
+  if (need_register) {
+      int32_t tmp =
+          OPAL_THREAD_ADD_FETCH32(&mca_coll_libnbc_component.active_comms, 1);
+      if (tmp == 1) {
+          opal_progress_register(ompi_coll_libnbc_progress);
+      }
+  }
+
+  handle->comm=comm;
+  /*printf("got module: %lu tag: %i\n", module, module->tag);*/
+
+  /******************** end of tag and shadow comm administration ...  ***************/
+  handle->comminfo = module;
+
+  NBC_DEBUG(3, "got tag %i\n", handle->tag);
+
+  handle->tmpbuf = tmpbuf;
+  handle->schedule = schedule;
+  *request = (ompi_request_t *) handle;
+
+  return OMPI_SUCCESS;
+}
+
 #ifdef NBC_CACHE_SCHEDULE
 void NBC_SchedCache_args_delete_key_dummy(void *k) {
     /* do nothing because the key and the data element are identical :-)
