@@ -204,6 +204,12 @@ static int NBC_Sched_send_internal (const void* buf, char tmpbuf, int count, MPI
   return OMPI_SUCCESS;
 }
 
+int NBC_Sched_local_put (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,
+                         NBC_Schedule *schedule, bool barrier) {
+  return NBC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, true, schedule, barrier);
+}
+
+
 int NBC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, false, schedule, barrier);
 }
@@ -235,6 +241,10 @@ static int NBC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datat
   NBC_DEBUG(10, "added receive - ends at byte %d\n", nbc_schedule_get_size (schedule));
 
   return OMPI_SUCCESS;
+}
+
+int NBC_Sched_local_get (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
+  return NBC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, true, schedule, barrier);
 }
 
 int NBC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
