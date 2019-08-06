@@ -512,7 +512,7 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         if(putargs.tmpbuf) {
           buf1=(char*)handle->tmpbuf+(long)putargs.buf;
         } else {
-          buf1=(void *)sendargs.buf;
+          buf1=(void *)putargs.buf;
         }
 #ifdef NBC_TIMING
         Iput_time -= MPI_Wtime();
