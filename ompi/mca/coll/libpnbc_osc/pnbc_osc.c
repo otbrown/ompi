@@ -509,7 +509,7 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         /* get an additional request */
         handle->req_count++;
         /* get buffer */
-        if(sendargs.tmpbuf) {
+        if(putargs.tmpbuf) {
           buf1=(char*)handle->tmpbuf+(long)sendargs.buf;
         } else {
           buf1=(void *)sendargs.buf;
