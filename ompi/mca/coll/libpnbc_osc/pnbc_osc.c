@@ -514,15 +514,16 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
       case PUT:
         NBC_DEBUG(5,"  PUT (offset %li) ", offset);
         NBC_GET_BYTES(ptr,putargs);
-        NBC_DEBUG(5,"*buf: %p, count: %i, type: %p, dest: %i, tag: %i)\n", putargs.buf,
-                  putargs.count, putargs.datatype, putargs.dest, handle->tag);
+        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", putargs.buf, putargs.origin_count, putargs.origin_datatype, putargs.target,
+                  putargs.target_count, putargs.target_datatype, handle->tag);
+        
         /* get an additional request */
         handle->req_count++;
         /* get buffer */
-        if(sendargs.tmpbuf) {
-          buf1=(char*)handle->tmpbuf+(long)sendargs.buf;
+        if(putargs.tmpbuf) {
+          buf1=(char*)handle->tmpbuf+(long)putargs.buf;
         } else {
-          buf1=(void *)sendargs.buf;
+          buf1=(void *)putargs.buf;
         }
 #ifdef NBC_TIMING
         Iput_time -= MPI_Wtime();
@@ -533,12 +534,15 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         }
         
         handle->req_array = tmp;
-        res = handle->win->w_osc_module->osc_put(buf1, putargs.count, putargs.datatype,
-                                         putargs.dest, 0, putargs.count,
-                                         putargs.datatype, handle->win);
+        res = handle->win->w_osc_module->osc_put(buf1, putargs.origin_count, putargs.origin_datatype,
+                                         putargs.target, 0, putargs.target_count,
+                                         putargs.target_datatype, handle->win);
 
         if (OMPI_SUCCESS != res) {
-          NBC_Error ("Error in MPI_Iput(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, putargs.count, putargs.datatype, putargs.dest, handle->tag, (unsigned long)handle->comm, res);
+          NBC_Error ("Error in MPI_Iput(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)", (unsigned long)buf1, 
+                     putargs.origin_count, putargs.origin_datatype, putargs.target, 
+                     putargs.target_count, putargs.target_datatype, handle->tag, 
+                     (unsigned long)handle->comm, res);
           return res;
         }
 #ifdef NBC_TIMING
@@ -548,15 +552,15 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
      case GET:
         NBC_DEBUG(5,"  GET (offset %li) ", offset);
         NBC_GET_BYTES(ptr,getargs);
-        NBC_DEBUG(5,"*buf: %p, count: %i, type: %p, dest: %i, tag: %i)\n", getargs.buf,
-                  getargs.count, getargs.datatype, getargs.source, handle->tag);
+        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", getargs.buf, getargs.origin_count, getargs.origin_datatype, getargs.target,
+                  getargs.target_count, getargs.target_datatype, handle->tag);
         /* get an additional request */
         handle->req_count++;
         /* get buffer */
-        if(sendargs.tmpbuf) {
-          buf1=(char*)handle->tmpbuf+(long)sendargs.buf;
+        if(getargs.tmpbuf) {
+          buf1=(char*)handle->tmpbuf+(long)getargs.buf;
         } else {
-          buf1=(void *)sendargs.buf;
+          buf1=(void *)getargs.buf;
         }
 #ifdef NBC_TIMING
         Iget_time -= MPI_Wtime();
@@ -569,13 +573,14 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         
         handle->req_array = tmp;
 
-        res = handle->win->w_osc_module->osc_get(buf1, getargs.count, getargs.datatype,
-                                         getargs.source, 0, getargs.count,
-                                         getargs.datatype, handle->win);
+        res = handle->win->w_osc_module->osc_get(buf1, getargs.origin_count, getargs.origin_datatype,
+                                         getargs.target, 0, getargs.target_count,
+                                         getargs.target_datatype, handle->win);
 
         if (OMPI_SUCCESS != res) {
-          NBC_Error ("Error in MPI_Iget(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, 
-                     getargs.count, getargs.datatype, getargs.source, handle->tag, 
+          NBC_Error ("Error in MPI_Iget(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)", (unsigned long)buf1, 
+                     getargs.origin_count, getargs.origin_datatype, getargs.target, 
+                     getargs.target_count, getargs.target_datatype,  handle->tag, 
                      (unsigned long)handle->comm, res);
           return res;
         }
