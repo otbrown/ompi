@@ -92,10 +92,12 @@ typedef enum {
 /* the put argument struct */
 typedef struct {
   NBC_Fn_type type;
-  int count;
+  int origin_count;
+  int target_count;
   const void *buf;
-  MPI_Datatype datatype;
-  int dest;
+  MPI_Datatype origin_datatype;
+  MPI_Datatype target_datatype;
+  int target;
   char tmpbuf;
   bool local;
 } NBC_Args_put;
@@ -103,11 +105,13 @@ typedef struct {
 /* the get argument struct */
 typedef struct {
   NBC_Fn_type type;
-  int count;
+  int origin_count;
+  int target_count;
   const void *buf;
-  MPI_Datatype datatype;
+  MPI_Datatype origin_datatype;
+  MPI_Datatype target_datatype;
+  int target;
   char tmpbuf;
-  int source;
   bool local;
 } NBC_Args_get;
   
