@@ -175,14 +175,20 @@ typedef struct {
 
 /* internal function prototypes */
   /* Put */
-int NBC_Sched_put (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier);
-int NBC_Sched_local_put (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,
-                         NBC_Schedule *schedule, bool barrier);
+int NBC_Sched_put (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
+                   int target, int target_count,  MPI_Datatype target_datatype, 
+                   NBC_Schedule *schedule, bool barrier);
+int NBC_Sched_local_put (const void* buf, char tmpbuf, int origin_count, 
+                         MPI_Datatype origin_datatype,
+                         int target, NBC_Schedule *schedule, bool barrier);
   
   /* Get */
-  int NBC_Sched_get (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier);
-  int NBC_Sched_local_get (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, 
-                           NBC_Schedule *schedule, bool barrier);
+int NBC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
+                   int target, int target_count,  MPI_Datatype target_datatype, 
+                   NBC_Schedule *schedule, bool barrier);
+int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, 
+                         MPI_Datatype origin_datatype, int target, NBC_Schedule *schedule,
+                         bool barrier);
   
   /* Send */
 int NBC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier);

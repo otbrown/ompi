@@ -119,7 +119,10 @@ static int nbc_schedule_round_append (NBC_Schedule *schedule, void *data, int da
 
 
 /* this function puts a put into the schedule */
-static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, bool local, NBC_Schedule *schedule, bool barrier) {
+static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int origin_count, 
+                                   MPI_Datatype origin_datatype, int target, int target_count, 
+                                   MPI_Datatype target_datatype, bool local, NBC_Schedule *schedule, 
+                                   bool barrier) {
   NBC_Args_put put_args;
   int ret;
 
@@ -128,9 +131,11 @@ static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int count, MPI_
   put_args.buf = buf;
   /*TODO: most likely we don't need this for single sided*/
   put_args.tmpbuf = tmpbuf;
-  put_args.count = count;
-  put_args.datatype = datatype;
-  put_args.dest = dest;
+  put_args.origin_count = origin_count;
+  put_args.origin_datatype = origin_datatype;
+  put_args.target = target;
+  put_args.target_count = target_count;
+  put_args.target_datatype = target_datatype;
   put_args.local = local;
 
   /* append to the round-schedule */
@@ -144,13 +149,19 @@ static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int count, MPI_
   return OMPI_SUCCESS;
 }
 
-int NBC_Sched_put (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier) {
-  return NBC_Sched_put_internal (buf, tmpbuf, count, datatype, dest, false, schedule, barrier);
+int NBC_Sched_put (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
+                   int target, int target_count,  MPI_Datatype target_datatype, 
+                   NBC_Schedule *schedule, bool barrier) {
+  return NBC_Sched_put_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
+                                 target_datatype, false, schedule, barrier);
 }
 
 
 /* this function puts a get into the schedule */
-static int NBC_Sched_get_internal (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, bool local, NBC_Schedule *schedule, bool barrier) {
+static int NBC_Sched_get_internal (const void* buf, char tmpbuf, int origin_count, 
+                                   MPI_Datatype origin_datatype, int target, int target_count, 
+                                   MPI_Datatype target_datatype, bool local, NBC_Schedule *schedule, 
+                                   bool barrier) {
   NBC_Args_get get_args;
   int ret;
 
@@ -159,9 +170,11 @@ static int NBC_Sched_get_internal (const void* buf, char tmpbuf, int count, MPI_
   get_args.buf = buf;
   /*TODO: most likely we don't need this for single sided*/
   get_args.tmpbuf = tmpbuf;
-  get_args.count = count;
-  get_args.datatype = datatype;
-  get_args.source = source;
+  get_args.origin_count = origin_count;
+  get_args.origin_datatype = origin_datatype;
+  get_args.target = target;
+  get_args.target_count = target_count;
+  get_args.target_datatype = target_datatype;
   get_args.local = local;
 
   /* append to the round-schedule */
@@ -175,8 +188,11 @@ static int NBC_Sched_get_internal (const void* buf, char tmpbuf, int count, MPI_
   return OMPI_SUCCESS;
 }
 
-int NBC_Sched_get (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
-  return NBC_Sched_get_internal (buf, tmpbuf, count, datatype, source, false, schedule, barrier);
+int NBC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
+                   int target, int target_count,  MPI_Datatype target_datatype, 
+                   NBC_Schedule *schedule, bool barrier) {
+  return NBC_Sched_get_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
+                                 target_datatype, false, schedule, barrier);
 }
 
 /* this function puts a send into the schedule */
@@ -204,9 +220,10 @@ static int NBC_Sched_send_internal (const void* buf, char tmpbuf, int count, MPI
   return OMPI_SUCCESS;
 }
 
-int NBC_Sched_local_put (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,
-                         NBC_Schedule *schedule, bool barrier) {
-  return NBC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, true, schedule, barrier);
+int NBC_Sched_local_put (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
+                         int target, NBC_Schedule *schedule, bool barrier) {
+  return NBC_Sched_send_internal (buf, tmpbuf, origin_count, origin_datatype, target, true,
+                                  schedule, barrier);
 }
 
 
@@ -243,8 +260,10 @@ static int NBC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datat
   return OMPI_SUCCESS;
 }
 
-int NBC_Sched_local_get (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
-  return NBC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, true, schedule, barrier);
+int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
+                         int target, NBC_Schedule *schedule, bool barrier) {
+  return NBC_Sched_recv_internal(buf, tmpbuf, origin_count, origin_datatype, target, true,
+                                 schedule, barrier);
 }
 
 int NBC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
