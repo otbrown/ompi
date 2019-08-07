@@ -129,8 +129,7 @@ static int NBC_Sched_put_internal (const void* buf, char tmpbuf, int origin_coun
   /* store the passed arguments */
   put_args.type = PUT;
   put_args.buf = buf;
-  /*TODO: most likely we don't need this for single sided*/
-  put_args.tmpbuf = tmpbuf;
+  put_args.tmpbuf = tmpbuf;   /*TODO: most likely we don't need this for single sided */
   put_args.origin_count = origin_count;
   put_args.origin_datatype = origin_datatype;
   put_args.target = target;
@@ -168,8 +167,7 @@ static int NBC_Sched_get_internal (const void* buf, char tmpbuf, int origin_coun
   /* store the passed arguments */
   get_args.type = GET;
   get_args.buf = buf;
-  /*TODO: most likely we don't need this for single sided*/
-  get_args.tmpbuf = tmpbuf;
+  get_args.tmpbuf = tmpbuf;   /* TODO: most likely we don't need this for single sided */
   get_args.origin_count = origin_count;
   get_args.origin_datatype = origin_datatype;
   get_args.target = target;
