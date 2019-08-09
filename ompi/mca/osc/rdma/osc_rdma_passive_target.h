@@ -30,6 +30,20 @@
 int ompi_osc_rdma_lock_atomic (int lock_type, int target, int assert, ompi_win_t *win);
 
 /**
+ * @brief Non-blocking lock the target in the window using network/cpu atomics
+ *
+ * @param[in] lock_type        mpi lock type (MPI_LOCK_SHARED, MPI_LOCK_EXCLUSIVE)
+ * @param[in] target           target process
+ * @param[in] assert           asserts
+ * @param[in] win              mpi window
+ *
+ * @returns OMPI_SUCCESS on success
+ * @returns OMPI_ERR_RMA_SYNC if there is a conflicting RMA epoch
+ */
+int ompi_osc_rdma_ilock_atomic (int lock_type, int target, int assert, ompi_win_t *win);
+
+
+/**
  * @brief unlock the target in the window using network/cpu atomics
  *
  * @param[in] target           target process
