@@ -42,7 +42,6 @@ int ompi_osc_rdma_lock_atomic (int lock_type, int target, int assert, ompi_win_t
  */
 int ompi_osc_rdma_ilock_atomic (int lock_type, int target, int assert, ompi_win_t *win);
 
-
 /**
  * @brief unlock the target in the window using network/cpu atomics
  *
@@ -53,6 +52,17 @@ int ompi_osc_rdma_ilock_atomic (int lock_type, int target, int assert, ompi_win_
  * @returns OMPI_ERR_RMA_SYNC if the target is not locked
  */
 int ompi_osc_rdma_unlock_atomic (int target, ompi_win_t *win);
+
+/**
+ * @brief Non-blocking unlock the target in the window using network/cpu atomics
+ *
+ * @param[in] target           target process
+ * @param[in] win              mpi window
+ *
+ * @returns OMPI_SUCCESS on success
+ * @returns OMPI_ERR_RMA_SYNC if the target is not locked
+ */
+int ompi_osc_rdma_iunlock_atomic (int target, ompi_win_t *win);
 
 /**
  * @brief lock all targets in window using network/cpu atomics
