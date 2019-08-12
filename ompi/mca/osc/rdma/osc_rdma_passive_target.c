@@ -161,8 +161,84 @@ static inline int ompi_osc_rdma_lock_atomic_internal (ompi_osc_rdma_module_t *mo
     return OMPI_SUCCESS;
 }
 
+/* locking via atomics */
+static inline int ompi_osc_rdma_ilock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
+                                                      ompi_osc_rdma_sync_t *lock)
+{
+    const int locking_mode = module->locking_mode;
+    int ret;
+
+    if (MPI_LOCK_EXCLUSIVE == lock->sync.lock.type) {
+        
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "incrementing global exclusive lock");
+        if (OMPI_OSC_RDMA_LOCKING_TWO_LEVEL == locking_mode) {
+            /* lock the master lock. this requires no rank has a global shared lock */
+            ret = ompi_osc_rdma_lock_acquire_shared (module, module->leader, 1, offsetof (ompi_osc_rdma_state_t, global_lock),
+                                                     0xffffffff00000000L);
+            if (OMPI_SUCCESS != ret) {
+                ompi_osc_rdma_progress (module);
+                return ret;
+            }
+        }
+        
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "acquiring exclusive lock on peer");
+        ret = ompi_osc_rdma_lock_try_acquire_exclusive (module, peer,  offsetof (ompi_osc_rdma_state_t, local_lock));
+        /* failure */
+        if (ret == 1) {
+            /* release the global lock */
+            if (OMPI_OSC_RDMA_LOCKING_TWO_LEVEL == locking_mode) {
+                ompi_osc_rdma_lock_release_shared (module, module->leader, -1, offsetof (ompi_osc_rdma_state_t, global_lock));
+            }
+            ompi_osc_rdma_progress (module);
+            return ret;
+        }
+        
+        peer->flags |= OMPI_OSC_RDMA_PEER_EXCLUSIVE;
+        return ret;
+ 
+    } else {
+ 
+
+        /* go right to the target to acquire a shared lock */
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "incrementing global shared lock");
+        ret = ompi_osc_rdma_lock_acquire_shared (module, peer, 1, offsetof (ompi_osc_rdma_state_t, local_lock),
+                                                 OMPI_OSC_RDMA_LOCK_EXCLUSIVE);
+        if (OMPI_SUCCESS == ret) {
+            return OMPI_SUCCESS;
+        }
+        
+        ompi_osc_rdma_progress (module);
+        return ret;
+    }
+
+}
+
 static inline int ompi_osc_rdma_unlock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
                                                         ompi_osc_rdma_sync_t *lock)
+{
+    const int locking_mode = module->locking_mode;
+
+    if (MPI_LOCK_EXCLUSIVE == lock->sync.lock.type) {
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "releasing exclusive lock on peer");
+        ompi_osc_rdma_lock_release_exclusive (module, peer, offsetof (ompi_osc_rdma_state_t, local_lock));
+
+        if (OMPI_OSC_RDMA_LOCKING_TWO_LEVEL == locking_mode) {
+            OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "decrementing global exclusive lock");
+            ompi_osc_rdma_lock_release_shared (module, module->leader, -1, offsetof (ompi_osc_rdma_state_t, global_lock));
+        }
+
+        peer->flags &= ~OMPI_OSC_RDMA_PEER_EXCLUSIVE;
+    } else {
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "decrementing global shared lock");
+        ompi_osc_rdma_lock_release_shared (module, peer, -1, offsetof (ompi_osc_rdma_state_t, local_lock));
+        peer->flags &= ~OMPI_OSC_RDMA_PEER_DEMAND_LOCKED;
+    }
+
+    return OMPI_SUCCESS;
+}
+
+static inline int ompi_osc_rdma_iunlock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
+                                                         ompi_osc_rdma_sync_t *lock)
 {
     const int locking_mode = module->locking_mode;
 
@@ -246,6 +322,63 @@ int ompi_osc_rdma_lock_atomic (int lock_type, int target, int assert, ompi_win_t
 
     if (0 == (assert & MPI_MODE_NOCHECK)) {
         ret = ompi_osc_rdma_lock_atomic_internal (module, peer, lock);
+    }
+
+    if (OPAL_LIKELY(OMPI_SUCCESS == ret)) {
+        ++module->passive_target_access_epoch;
+
+        opal_atomic_wmb ();
+
+        OPAL_THREAD_SCOPED_LOCK(&module->lock, ompi_osc_rdma_module_lock_insert (module, lock));
+    } else {
+        OBJ_RELEASE(lock);
+    }
+
+    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "lock %d complete", target);
+
+    return ret;
+}
+
+int ompi_osc_rdma_ilock_atomic (int lock_type, int target, int assert, ompi_win_t *win)
+{
+    ompi_osc_rdma_module_t *module = GET_MODULE(win);
+    ompi_osc_rdma_peer_t *peer = ompi_osc_rdma_module_peer (module, target);
+    ompi_osc_rdma_sync_t *lock;
+    int ret = OMPI_SUCCESS;
+
+    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "lock: %d, %d, %d, %s", lock_type, target, assert, win->w_name);
+
+    if (module->no_locks) {
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_INFO, "attempted to lock with no_locks set");
+        return OMPI_ERR_RMA_SYNC;
+    }
+
+    if (module->all_sync.epoch_active && (OMPI_OSC_RDMA_SYNC_TYPE_LOCK != module->all_sync.type || MPI_LOCK_EXCLUSIVE == lock_type)) {
+        /* impossible to get an exclusive lock while holding a global shared lock or in a active
+         * target access epoch */
+        return OMPI_ERR_RMA_SYNC;
+    }
+
+    /* clear the global sync object (in case MPI_Win_fence was called) */
+    module->all_sync.type = OMPI_OSC_RDMA_SYNC_TYPE_NONE;
+
+    /* create lock item */
+    lock = ompi_osc_rdma_sync_allocate (module);
+    if (OPAL_UNLIKELY(NULL == lock)) {
+        return OMPI_ERR_OUT_OF_RESOURCE;
+    }
+
+    lock->type = OMPI_OSC_RDMA_SYNC_TYPE_LOCK;
+    lock->sync.lock.target = target;
+    lock->sync.lock.type = lock_type;
+    lock->sync.lock.assert = assert;
+
+    lock->peer_list.peer = peer;
+    lock->num_peers = 1;
+    OBJ_RETAIN(peer);
+
+    if (0 == (assert & MPI_MODE_NOCHECK)) {
+        ret = ompi_osc_rdma_ilock_atomic_internal (module, peer, lock);
     }
 
     if (OPAL_LIKELY(OMPI_SUCCESS == ret)) {
