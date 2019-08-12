@@ -594,8 +594,8 @@ static inline bool ompi_osc_rdma_sync_rdma_icomplete (ompi_osc_rdma_sync_t *sync
 {
 
 #if !defined(BTL_VERSION) || (BTL_VERSION < 310)
-    /* there are outstanding rdma operations */
     opal_progress ();
+    /* there are still outstanding rdma operations */
     if (ompi_osc_rdma_sync_get_count (sync)){
         return false;        
     }else{
