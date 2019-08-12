@@ -451,7 +451,7 @@ int ompi_osc_rdma_iunlock_atomic (int target, ompi_win_t *win)
 
     OPAL_THREAD_LOCK(&module->lock);
 
-    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "unlock: %d, %s", target, win->w_name);
+    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "iunlock: %d, %s", target, win->w_name);
 
     lock = ompi_osc_rdma_module_lock_find (module, target, &peer);
     if (OPAL_UNLIKELY(NULL == lock)) {
@@ -464,16 +464,18 @@ int ompi_osc_rdma_iunlock_atomic (int target, ompi_win_t *win)
     ompi_osc_rdma_module_lock_remove (module, lock);
 
     /* finish all outstanding fragments */
-    ompi_osc_rdma_sync_rdma_complete (lock);
+    if(ompi_osc_rdma_sync_rdma_icomplete (lock) == false){
+        return OMPI_ERR_RMA_SYNC;
+    }
 
     if (!(lock->sync.lock.assert & MPI_MODE_NOCHECK)) {
-        ret = ompi_osc_rdma_unlock_atomic_internal (module, peer, lock);
+        ret = ompi_osc_rdma_iunlock_atomic_internal (module, peer, lock);
     }
 
     /* release our reference to this peer */
     OBJ_RELEASE(peer);
 
-    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "unlock %d complete", target);
+    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "iunlock %d complete", target);
 
     --module->passive_target_access_epoch;
 
