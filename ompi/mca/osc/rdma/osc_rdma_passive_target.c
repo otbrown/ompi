@@ -162,7 +162,7 @@ static inline int ompi_osc_rdma_lock_atomic_internal (ompi_osc_rdma_module_t *mo
 }
 
 /* locking via atomics */
-static inline int ompi_osc_rdma_ilock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
+static inline int ompi_osc_rdma_try_lock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
                                                       ompi_osc_rdma_sync_t *lock)
 {
     const int locking_mode = module->locking_mode;
@@ -237,8 +237,8 @@ static inline int ompi_osc_rdma_unlock_atomic_internal (ompi_osc_rdma_module_t *
     return OMPI_SUCCESS;
 }
 
-static inline int ompi_osc_rdma_iunlock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
-                                                         ompi_osc_rdma_sync_t *lock)
+static inline int ompi_osc_rdma_try_unlock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
+                                                            ompi_osc_rdma_sync_t *lock)
 {
     const int locking_mode = module->locking_mode;
 
@@ -339,7 +339,7 @@ int ompi_osc_rdma_lock_atomic (int lock_type, int target, int assert, ompi_win_t
     return ret;
 }
 
-int ompi_osc_rdma_ilock_atomic (int lock_type, int target, int assert, ompi_win_t *win)
+int ompi_osc_rdma_try_lock_atomic (int lock_type, int target, int assert, ompi_win_t *win)
 {
     ompi_osc_rdma_module_t *module = GET_MODULE(win);
     ompi_osc_rdma_peer_t *peer = ompi_osc_rdma_module_peer (module, target);
@@ -378,7 +378,7 @@ int ompi_osc_rdma_ilock_atomic (int lock_type, int target, int assert, ompi_win_
     OBJ_RETAIN(peer);
 
     if (0 == (assert & MPI_MODE_NOCHECK)) {
-        ret = ompi_osc_rdma_ilock_atomic_internal (module, peer, lock);
+        ret = ompi_osc_rdma_try_lock_atomic_internal (module, peer, lock);
     }
 
     if (OPAL_LIKELY(OMPI_SUCCESS == ret)) {
@@ -388,7 +388,12 @@ int ompi_osc_rdma_ilock_atomic (int lock_type, int target, int assert, ompi_win_
 
         OPAL_THREAD_SCOPED_LOCK(&module->lock, ompi_osc_rdma_module_lock_insert (module, lock));
     } else {
-        OBJ_RELEASE(lock);
+        
+        /* release reference to peer */
+        OBJ_RELEASE(peer);
+        
+        /* delete the lock */
+        ompi_osc_rdma_sync_return (lock);
     }
 
     OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "lock %d complete", target);
@@ -442,7 +447,7 @@ int ompi_osc_rdma_unlock_atomic (int target, ompi_win_t *win)
     return ret;
 }
 
-int ompi_osc_rdma_iunlock_atomic (int target, ompi_win_t *win)
+int ompi_osc_rdma_try_unlock_atomic (int target, ompi_win_t *win)
 {
     ompi_osc_rdma_module_t *module = GET_MODULE(win);
     ompi_osc_rdma_peer_t *peer;
@@ -451,7 +456,7 @@ int ompi_osc_rdma_iunlock_atomic (int target, ompi_win_t *win)
 
     OPAL_THREAD_LOCK(&module->lock);
 
-    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "iunlock: %d, %s", target, win->w_name);
+    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "try_unlock: %d, %s", target, win->w_name);
 
     lock = ompi_osc_rdma_module_lock_find (module, target, &peer);
     if (OPAL_UNLIKELY(NULL == lock)) {
@@ -464,18 +469,19 @@ int ompi_osc_rdma_iunlock_atomic (int target, ompi_win_t *win)
     ompi_osc_rdma_module_lock_remove (module, lock);
 
     /* finish all outstanding fragments */
-    if(ompi_osc_rdma_sync_rdma_icomplete (lock) == false){
-        return OMPI_ERR_RMA_SYNC;
+    if(OMPI_ERR_RMA_NB_PENDING == ompi_osc_rdma_sync_rdma_icomplete (lock)){
+        OPAL_THREAD_UNLOCK(&module->lock);
+        return OMPI_ERR_RMA_NB_PENDING;
     }
 
     if (!(lock->sync.lock.assert & MPI_MODE_NOCHECK)) {
-        ret = ompi_osc_rdma_iunlock_atomic_internal (module, peer, lock);
+        ret = ompi_osc_rdma_try_unlock_atomic_internal (module, peer, lock);
     }
 
     /* release our reference to this peer */
     OBJ_RELEASE(peer);
 
-    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "iunlock %d complete", target);
+    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "try_unlock %d complete", target);
 
     --module->passive_target_access_epoch;
 

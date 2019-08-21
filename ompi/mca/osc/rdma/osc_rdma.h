@@ -583,23 +583,24 @@ static inline void ompi_osc_rdma_sync_rdma_complete (ompi_osc_rdma_sync_t *sync)
 }
 
 /**
- * @brief complete (non-blocking) all outstanding rdma operations to all peers
+ * @brief Nonblocking complete all outstanding rdma operations to all peers
  *
  * @param[in] module          osc rdma module
  * 
  * @returns true if complete is successful
- * @returns false otherwise
+ * @returns OMPI_ERR_RMA_NB_PENDING Complete is still pending, try again later
+ * @returns OMPI_SUCCESS Complete has executed correctly
  */
-static inline bool ompi_osc_rdma_sync_rdma_icomplete (ompi_osc_rdma_sync_t *sync)
+static inline int ompi_osc_rdma_sync_rdma_icomplete (ompi_osc_rdma_sync_t *sync)
 {
 
 #if !defined(BTL_VERSION) || (BTL_VERSION < 310)
     opal_progress ();
     /* there are still outstanding rdma operations */
     if (ompi_osc_rdma_sync_get_count (sync)){
-        return false;        
+        return OMPI_ERR_RMA_NB_PENDING;        
     }else{
-        return true;
+        return OMPI_SUCCESS;
     }
 #else
     mca_btl_base_module_t *btl_module = sync->module->selected_btl;
@@ -611,9 +612,9 @@ static inline bool ompi_osc_rdma_sync_rdma_icomplete (ompi_osc_rdma_sync_t *sync
     
      if (ompi_osc_rdma_sync_get_count (sync)         ||
          (sync->module->rdma_frag  &&  (sync->module->rdma_frag->pending > 1))){
-         return false;
+         return OMPI_ERR_RMA_NB_PENDING; 
      }else{
-         return true;
+         return OMPI_SUCCESS;
      }
 #endif
 }
