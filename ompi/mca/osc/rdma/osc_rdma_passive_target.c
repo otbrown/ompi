@@ -162,8 +162,7 @@ static inline int ompi_osc_rdma_lock_atomic_internal (ompi_osc_rdma_module_t *mo
 }
 
 /* locking via atomics */
-static inline int ompi_osc_rdma_try_lock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
-                                                      ompi_osc_rdma_sync_t *lock)
+static inline int ompi_osc_rdma_try_lock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer, ompi_osc_rdma_sync_t *lock)
 {
     const int locking_mode = module->locking_mode;
     int ret;
@@ -184,7 +183,7 @@ static inline int ompi_osc_rdma_try_lock_atomic_internal (ompi_osc_rdma_module_t
         OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "acquiring exclusive lock on peer");
         ret = ompi_osc_rdma_lock_try_acquire_exclusive (module, peer,  offsetof (ompi_osc_rdma_state_t, local_lock));
         /* failure */
-        if (ret == 1) {
+        if (OMPI_SUCCESS != ret) {
             /* release the global lock */
             if (OMPI_OSC_RDMA_LOCKING_TWO_LEVEL == locking_mode) {
                 ompi_osc_rdma_lock_release_shared (module, module->leader, -1, offsetof (ompi_osc_rdma_state_t, global_lock));
@@ -346,7 +345,8 @@ int ompi_osc_rdma_try_lock_atomic (int lock_type, int target, int assert, ompi_w
     ompi_osc_rdma_sync_t *lock;
     int ret = OMPI_SUCCESS;
 
-    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "lock: %d, %d, %d, %s", lock_type, target, assert, win->w_name);
+    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "try_lock: %d, %d, %d, %s", lock_type, target, assert, 
+                     win->w_name);
 
     if (module->no_locks) {
         OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_INFO, "attempted to lock with no_locks set");
