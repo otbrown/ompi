@@ -59,6 +59,9 @@ static ompi_errcode_intern_t ompi_err_rma_range_intern;
 static ompi_errcode_intern_t ompi_err_rma_conflict_intern;
 static ompi_errcode_intern_t ompi_err_win_intern;
 static ompi_errcode_intern_t ompi_err_rma_flavor_intern;
+static ompi_errcode_intern_t ompi_err_rma_nb_pending_intern;
+static ompi_errcode_intern_t ompi_err_rma_fatal_intern;
+
 
 static void ompi_errcode_intern_construct(ompi_errcode_intern_t* errcode);
 static void ompi_errcode_intern_destruct(ompi_errcode_intern_t* errcode);
@@ -284,6 +287,15 @@ int ompi_errcode_intern_init (void)
                      "OMPI_ERR_RMA_FLAVOR", OMPI_MAX_ERROR_STRING);
     opal_pointer_array_set_item(&ompi_errcodes_intern, ompi_err_rma_flavor_intern.index,
                                 &ompi_err_rma_flavor_intern);
+
+    OBJ_CONSTRUCT(&ompi_err_rma_nb_pending_intern, ompi_errcode_intern_t);
+    ompi_err_rma_nb_pending_intern.code = OMPI_ERR_RMA_NB_PENDING;
+    ompi_err_rma_nb_pending_intern.mpi_code = MPI_ERR_RMA_NB_PENDING;
+    ompi_err_rma_nb_pending_intern.index = pos++;
+    opal_string_copy(ompi_err_rma_nb_pending_intern.errstring,
+                     "OMPI_ERR_RMA_NB_PENDING", OMPI_MAX_ERROR_STRING);
+    opal_pointer_array_set_item(&ompi_errcodes_intern, ompi_err_rma_nb_pending_intern.index,
+                                &ompi_err_rma_nb_pending_intern);
 
     ompi_errcode_intern_lastused=pos;
     return OMPI_SUCCESS;

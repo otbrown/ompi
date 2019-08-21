@@ -74,6 +74,7 @@ enum {
     OMPI_ERR_RMA_CONFLICT           = OMPI_ERR_BASE - 6,
     OMPI_ERR_WIN                    = OMPI_ERR_BASE - 7,
     OMPI_ERR_RMA_FLAVOR             = OMPI_ERR_BASE - 8,
+    OMPI_ERR_RMA_NB_PENDING         = OMPI_ERR_BASE - 9,
 };
 
 #define OMPI_ERR_MAX                    (OMPI_ERR_BASE - 100)
