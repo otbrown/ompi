@@ -136,6 +136,8 @@ ompi_osc_base_module_t ompi_osc_rdma_module_rdma_template = {
 
     .osc_lock = ompi_osc_rdma_lock_atomic,
     .osc_unlock = ompi_osc_rdma_unlock_atomic,
+    .osc_try_lock = ompi_osc_rdma_try_lock_atomic,
+    .osc_try_unlock = ompi_osc_rdma_try_unlock_atomic,
     .osc_lock_all = ompi_osc_rdma_lock_all_atomic,
     .osc_unlock_all = ompi_osc_rdma_unlock_all_atomic,
 
