@@ -26,6 +26,7 @@ sources = \
 	coll_libpnbc_osc.h \
 	coll_libpnbc_osc_component.c \
 	pnbc_osc.c \
+	pnbc_osc_get.c \
 	pnbc_osc_internal.h \
 	pnbc_osc_iallgather.c \
 	pnbc_osc_iallgatherv.c \
