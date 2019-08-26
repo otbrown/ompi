@@ -42,9 +42,13 @@ static int nbc_try_get(void *origin_addr, int origin_count,  MPI_Datatype origin
   ret = win->w_osc_module->osc_try_lock(lock_type, target_rank, assert, win);
   /* we get the lock */
   if(OMPI_SUCCESS == ret){
-    win->w_osc_module->osc_get(origin_addr, origin_count, origin_datatype,
+    ret = win->w_osc_module->osc_get(origin_addr, origin_count, origin_datatype,
                                target_rank, target_disp, target_count,
                                target_datatype, win);
+    if (OMPI_SUCCESS != ret){
+      /* return error code */
+      return ret;
+    }
   }else{
     /* return error code */
     return ret;
@@ -60,4 +64,21 @@ static int nbc_try_get_all(void *origin_addr, int origin_count,  MPI_Datatype or
                            int target_rank, int assert, MPI_Aint target_disp, int target_count,
                            MPI_Datatype target_datatype, int lock_type, ompi_win_t *win){
   int ret;
-}
+  //TODO
+  /* go through all children proc */
+  /* for (int i = 0; i < max_children; i++){
+         if( OMPI_ERR_RMA_PENDING == state[i] ) { 
+           ret = nbc_try_get(....); 
+           if(OMPI_SUCCESS == ret) { 
+              state[i] = DONE;   
+              NUM_DONE++; 1
+           }  
+         }
+         if (NUM_TOTAL == NUM_DONE){
+            return OMPI_SUCCESS;
+         }else{
+            return OMPI_ERR_RMA_NB_PEDING;
+         }
+
+     }
+  */
