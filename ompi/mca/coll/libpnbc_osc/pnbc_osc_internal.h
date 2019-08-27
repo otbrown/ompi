@@ -86,7 +86,8 @@ typedef enum {
   COPY,
   UNPACK,
   PUT,
-  GET
+  GET,
+  TRY_GET
 } NBC_Fn_type;
 
 /* the put argument struct */
@@ -115,6 +116,20 @@ typedef struct {
   bool local;
 } NBC_Args_get;
   
+typedef struct {
+  NBC_Fn_type type;
+  int origin_count;
+  int target_count;
+  const void *buf;
+  MPI_Datatype origin_datatype;
+  MPI_Datatype target_datatype;
+  int target;
+  char tmpbuf;
+  bool local;
+  int lock_type;
+  int assert;
+} NBC_Args_try_get;  
+
 /* the send argument struct */
 typedef struct {
   NBC_Fn_type type;
@@ -189,7 +204,10 @@ int NBC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype 
 int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, 
                          MPI_Datatype origin_datatype, int target, NBC_Schedule *schedule,
                          bool barrier);
-  
+ /* try_get */
+  int NBC_Sched_try_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
+                         int target, int target_count,  MPI_Datatype target_datatype, 
+                         NBC_Schedule *schedule, int lock_type, int assert, bool barrier); 
   /* Send */
 int NBC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier);
 int NBC_Sched_local_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,NBC_Schedule *schedule, bool barrier);
