@@ -174,7 +174,7 @@ static int NBC_Sched_get_internal (const void* buf, char tmpbuf, int origin_coun
   get_args.target_count = target_count;
   get_args.target_datatype = target_datatype;
   get_args.local = local;
-
+  
   /* append to the round-schedule */
   ret = nbc_schedule_round_append (schedule, &get_args, sizeof (get_args), barrier);
   if (OMPI_SUCCESS != ret) {
@@ -191,6 +191,45 @@ int NBC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype 
                    NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_get_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
                                  target_datatype, false, schedule, barrier);
+}
+/* this function puts a get into the schedule */
+static int NBC_Sched_try_get_internal (const void* buf, char tmpbuf, int origin_count, 
+                                       MPI_Datatype origin_datatype, int target, int target_count, 
+                                       MPI_Datatype target_datatype, bool local, 
+                                       NBC_Schedule *schedule, int lock_type, int assert,
+                                       bool barrier) {
+  NBC_Args_try_get try_get_args;
+  int ret;
+
+  /* store the passed arguments */
+  try_get_args.type = TRY_GET;
+  try_get_args.buf = buf;
+  try_get_args.tmpbuf = tmpbuf;   /* TODO: most likely we don't need this for single sided */
+  try_get_args.origin_count = origin_count;
+  try_get_args.origin_datatype = origin_datatype;
+  try_get_args.target = target;
+  try_get_args.target_count = target_count;
+  try_get_args.target_datatype = target_datatype;
+  try_get_args.local = local;
+  try_get_args.lock_type = lock_type;
+  try_get_args.assert = assert;
+
+  /* append to the round-schedule */
+  ret = nbc_schedule_round_append (schedule, &try_get_args, sizeof (try_get_args), barrier);
+  if (OMPI_SUCCESS != ret) {
+    return ret;
+  }
+
+  NBC_DEBUG(10, "added try_get - ends at byte %i\n", nbc_schedule_get_size (schedule));
+
+  return OMPI_SUCCESS;
+}
+
+int NBC_Sched_try_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
+                       int target, int target_count,  MPI_Datatype target_datatype, 
+                       NBC_Schedule *schedule, int lock_type, int assert, bool barrier) {
+  return NBC_Sched_try_get_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
+                                     target_datatype, false, schedule, lock_type, assert, barrier);
 }
 
 /* this function puts a send into the schedule */
@@ -509,6 +548,7 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
   NBC_Fn_type type;
   NBC_Args_put      putargs;
   NBC_Args_get      getargs;
+  NBC_Args_try_get  trygetargs;
   NBC_Args_send     sendargs;
   NBC_Args_recv     recvargs;
   NBC_Args_op         opargs;
@@ -604,6 +644,63 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
 #ifdef NBC_TIMING
         Iget_time += MPI_Wtime();
 #endif
+        break;
+     case TRY_GET:
+        NBC_DEBUG(5,"  TRY_GET (offset %li) ", offset);
+        NBC_GET_BYTES(ptr,trygetargs);
+        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, trygetargs.target_count, trygetargs.target_datatype, handle->tag);
+        /* get an additional request */
+        handle->req_count++;
+        /* get buffer */
+        if(trygetargs.tmpbuf) {
+          buf1=(char*)handle->tmpbuf+(long)trygetargs.buf;
+        } else {
+          buf1=(void *)trygetargs.buf;
+        }
+#ifdef NBC_TIMING
+        Iget_time -= MPI_Wtime();
+#endif
+        //TODO: I am not too sure we need to realloc for PUT/GET - Not used
+        tmp = (MPI_Request *) realloc ((void *) handle->req_array, 
+                                       handle->req_count * sizeof (MPI_Request));
+        if (NULL == tmp) {
+          return OMPI_ERR_OUT_OF_RESOURCE;
+        }
+        
+        handle->req_array = tmp;
+        
+        /* [state is unlocked] */
+        res = handle->win->w_osc_module->osc_try_lock(trygetargs.lock_type, trygetargs.target, 
+                                              trygetargs.assert, handle->win);
+        if(OMPI_SUCCESS == res){
+          res = handle->win->w_osc_module->osc_get(buf1, trygetargs.origin_count, 
+                                                   trygetargs.origin_datatype,
+                                                   trygetargs.target, 0, trygetargs.target_count,
+                                                   trygetargs.target_datatype, handle->win);
+          if (OMPI_SUCCESS != res){
+            /* return error code */
+            NBC_Error ("Error in MPI_try_get(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)",
+                       (unsigned long)buf1, 
+                       trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, 
+                       trygetargs.target_count, trygetargs.target_datatype,  handle->tag, 
+                       (unsigned long)handle->comm, res);
+        
+            return res;
+          }
+        }else{
+          
+          return res;
+        }
+        
+        /* [state is locked] */
+        res = handle->win->w_osc_module->osc_try_unlock(trygetargs.target, handle->win);
+        if (OMPI_SUCCESS != res){
+          return res;
+        }
+#ifdef NBC_TIMING
+        Iget_time += MPI_Wtime();
+#endif
+   
         break;
       case SEND:
         NBC_DEBUG(5,"  SEND (offset %li) ", offset);
