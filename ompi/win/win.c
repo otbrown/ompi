@@ -356,6 +356,35 @@ ompi_win_create_dynamic(opal_info_t *info, ompi_communicator_t *comm, ompi_win_t
     return OMPI_SUCCESS;
 }
 
+int
+ompi_win_icreate_dynamic(opal_info_t *info, ompi_communicator_t *comm, ompi_win_t **newwin)
+{
+    ompi_win_t *win;
+    int model;
+    int ret;
+
+    ret = alloc_window (comm, info, MPI_WIN_FLAVOR_DYNAMIC, &win);
+    if (OMPI_SUCCESS != ret) {
+        return ret;
+    }
+
+    ret = ompi_osc_base_select(win, MPI_BOTTOM, 0, 1, comm, info, MPI_WIN_FLAVOR_DYNAMIC, &model);
+    if (OMPI_SUCCESS != ret) {
+        OBJ_RELEASE(win);
+        return ret;
+    }
+
+    ret = config_window(MPI_BOTTOM, 0, 1, MPI_WIN_FLAVOR_DYNAMIC, model, win);
+    if (OMPI_SUCCESS != ret) {
+        OBJ_RELEASE(win);
+        return ret;
+    }
+
+    *newwin = win;
+
+    return OMPI_SUCCESS;
+}
+
 
 int
 ompi_win_free(ompi_win_t *win)
