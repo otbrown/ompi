@@ -44,7 +44,10 @@ int ompi_osc_base_select(ompi_win_t *win,
                          ompi_communicator_t *comm,
                          opal_info_t *info,
                          int flavor,
+			 int nonblocking,
+			 ompi_request_t **req,
                          int *model);
+
 
 int ompi_osc_base_finalize(void);
 
