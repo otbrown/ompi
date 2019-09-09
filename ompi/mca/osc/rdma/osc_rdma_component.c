@@ -71,6 +71,11 @@ static int ompi_osc_rdma_component_query (struct ompi_win_t *win, void **base, s
 static int ompi_osc_rdma_component_select (struct ompi_win_t *win, void **base, size_t size, int disp_unit,
                                            struct ompi_communicator_t *comm, struct opal_info_t *info,
                                            int flavor, int *model);
+static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base, size_t size,
+                                            int disp_unit, struct ompi_communicator_t *comm, 
+                                            struct opal_info_t *info, int flavor, 
+                                            struct ompi_request_t **request, int *model);
+
 #if 0  // stale code?
 static int ompi_osc_rdma_set_info (struct ompi_win_t *win, struct opal_info_t *info);
 static int ompi_osc_rdma_get_info (struct ompi_win_t *win, struct opal_info_t **info_used);
@@ -105,6 +110,7 @@ ompi_osc_rdma_component_t mca_osc_rdma_component = {
         .osc_init = ompi_osc_rdma_component_init,
         .osc_query = ompi_osc_rdma_component_query,
         .osc_select = ompi_osc_rdma_component_select,
+        .osc_iselect = ompi_osc_rdma_component_iselect,
         .osc_finalize = ompi_osc_rdma_component_finalize
     }
 };
@@ -1303,6 +1309,216 @@ static int ompi_osc_rdma_component_select (struct ompi_win_t *win, void **base, 
 }
 
 
+static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base, size_t size,
+                                            int disp_unit, struct ompi_communicator_t *comm, 
+                                            struct opal_info_t *info, int flavor,
+                                            struct ompi_request_t **request, int *model)
+{
+    ompi_osc_rdma_module_t *module = NULL;
+    ompi_osc_rdma_request_t *rdma_request;
+    ompi_osc_rdma_peer_t *peer;
+    
+    int world_size = ompi_comm_size (comm);
+    int init_limit = 256;
+    int ret;
+    char *name;
+
+    /* the osc/sm component is the exclusive provider for support for shared
+     * memory windows */
+    if (MPI_WIN_FLAVOR_SHARED == flavor) {
+        return OMPI_ERR_NOT_SUPPORTED;
+    }
+
+    /* create module structure with all fields initialized to zero */
+    module = (ompi_osc_rdma_module_t *) calloc (1, sizeof (ompi_osc_rdma_module_t));
+    if (NULL == module) {
+        return OMPI_ERR_OUT_OF_RESOURCE;
+    }
+
+    /* initialize the objects, so that always free in cleanup */
+    OBJ_CONSTRUCT(&module->lock, opal_recursive_mutex_t);
+    OBJ_CONSTRUCT(&module->outstanding_locks, opal_hash_table_t);
+    OBJ_CONSTRUCT(&module->pending_posts, opal_list_t);
+    OBJ_CONSTRUCT(&module->peer_lock, opal_mutex_t);
+    OBJ_CONSTRUCT(&module->all_sync, ompi_osc_rdma_sync_t);
+
+    module->same_disp_unit = check_config_value_bool ("same_disp_unit", info);
+    module->same_size      = check_config_value_bool ("same_size", info);
+    module->no_locks       = check_config_value_bool ("no_locks", info);
+    module->locking_mode   = mca_osc_rdma_component.locking_mode;
+    module->acc_single_intrinsic = check_config_value_bool ("acc_single_intrinsic", info);
+    module->acc_use_amo = mca_osc_rdma_component.acc_use_amo;
+
+    module->all_sync.module = module;
+
+    module->flavor = flavor;
+    module->win = win;
+    module->disp_unit = disp_unit;
+    module->size = size;
+
+    /* set the module so we properly cleanup */
+    win->w_osc_module = (ompi_osc_base_module_t*) module;
+
+    if (!module->no_locks) {
+        if (world_size > init_limit) {
+            ret = opal_hash_table_init (&module->outstanding_locks, init_limit);
+            if (OPAL_SUCCESS != ret) {
+                ompi_osc_rdma_free (win);
+                return ret;
+            }
+        } else {
+            module->outstanding_lock_array = calloc (world_size, sizeof (module->outstanding_lock_array[0]));
+            if (NULL == module->outstanding_lock_array) {
+                ompi_osc_rdma_free (win);
+                return OMPI_ERR_OUT_OF_RESOURCE;
+            }
+        }
+    }
+    
+    OMPI_OSC_RDMA_REQUEST_ALLOC(module, peer, rdma_request);
+    rdma_request->type = OMPI_OSC_RDMA_TYPE_WIN;
+
+    ret = ompi_comm_idup(comm, &module->comm, request);
+    if(OMPI_SUCCESS != ret){
+        ompi_osc_rdma_free (win);
+        OMPI_OSC_RDMA_REQUEST_RETURN(rdma_request);
+        return ret;
+    }
+    
+    //*request = (ompi_request_t *) rdma_request;
+    
+    /* OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_INFO, "creating osc/rdma window of flavor %d with id %d",
+       flavor, ompi_comm_get_cid(module->comm)); */
+
+    /* peer data */
+    if (world_size > init_limit) {
+        OBJ_CONSTRUCT(&module->peer_hash, opal_hash_table_t);
+        ret = opal_hash_table_init (&module->peer_hash, init_limit);
+    } else {
+        module->peer_array = calloc (world_size, sizeof (ompi_osc_rdma_peer_t *));
+        if (NULL == module->peer_array) {
+            ret = OMPI_ERR_OUT_OF_RESOURCE;
+        }
+    }
+
+    if (OPAL_SUCCESS != ret) {
+        ompi_osc_rdma_free (win);
+        return ret;
+    }
+
+    /* find rdma capable endpoints */
+    ret = ompi_osc_rdma_query_btls (module->comm, &module->selected_btl);
+    if (OMPI_SUCCESS != ret) {
+        ompi_osc_rdma_free (win);
+        return ret;
+    }
+
+    /* calculate and store various structure sizes */
+
+    module->region_size = module->selected_btl->btl_registration_handle_size + 
+        sizeof (ompi_osc_rdma_region_t);
+    
+    module->state_size = sizeof (ompi_osc_rdma_state_t);
+
+    if (MPI_WIN_FLAVOR_DYNAMIC != module->flavor) {
+        module->state_size += module->region_size;
+    } else {
+        module->state_size += mca_osc_rdma_component.max_attach * module->region_size;
+    }
+/*
+ * These are the info's that this module is interested in
+ */
+    opal_infosubscribe_subscribe(&win->super, "no_locks", "false", ompi_osc_rdma_set_no_lock_info);
+
+/*
+ * TODO: same_size, same_disp_unit have w_flag entries, but do not appear
+ * to be used anywhere.  If that changes, they should be subscribed
+ */
+
+    /* fill in the function pointer part */
+    memcpy(&module->super, &ompi_osc_rdma_module_rdma_template, sizeof(module->super));
+
+    ret = ompi_osc_rdma_check_parameters (module, disp_unit, size);
+    if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
+        ompi_osc_rdma_free (win);
+        return ret;
+    }
+
+    ret = ompi_osc_rdma_create_groups (module);
+    if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
+        ompi_osc_rdma_free (win);
+        return ret;
+    }
+
+    /* fill in our part */
+    ret = allocate_state_shared (module, base, size);
+    if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "failed to allocate internal state");
+        ompi_osc_rdma_free (win);
+        return ret;
+    }
+
+    if (MPI_WIN_FLAVOR_DYNAMIC == flavor) {
+        /* allocate space to store local btl handles for attached regions */
+        module->dynamic_handles = (ompi_osc_rdma_handle_t *) calloc (mca_osc_rdma_component.max_attach,
+                                                                     sizeof (module->dynamic_handles[0]));
+        if (NULL == module->dynamic_handles) {
+            ompi_osc_rdma_free (win);
+            return OMPI_ERR_OUT_OF_RESOURCE;
+        }
+    }
+
+    /* lock data */
+    if (module->no_locks) {
+        win->w_flags |= OMPI_WIN_NO_LOCKS;
+    }
+
+    if (module->same_size) {
+        win->w_flags |= OMPI_WIN_SAME_SIZE;
+    }
+
+    if (module->same_disp_unit) {
+        win->w_flags |= OMPI_WIN_SAME_DISP;
+    }
+
+    /* update component data */
+    OPAL_THREAD_LOCK(&mca_osc_rdma_component.lock);
+    ret = opal_hash_table_set_value_uint32(&mca_osc_rdma_component.modules,
+                                           ompi_comm_get_cid(module->comm),
+                                           module);
+    OPAL_THREAD_UNLOCK(&mca_osc_rdma_component.lock);
+    if (OMPI_SUCCESS != ret) {
+        ompi_osc_rdma_free (win);
+        return ret;
+    }
+
+    /* fill in window information */
+    *model = MPI_WIN_UNIFIED;
+    win->w_osc_module = (ompi_osc_base_module_t*) module;
+    opal_asprintf(&name, "rdma window %d", ompi_comm_get_cid(module->comm));
+    ompi_win_set_name(win, name);
+    free(name);
+
+    /* sync memory - make sure all initialization completed */
+    opal_atomic_mb();
+
+    ret = ompi_osc_rdma_share_data (module);
+    if (OMPI_SUCCESS != ret) {
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "failed to share window data with peers");
+        ompi_osc_rdma_free (win);
+    } else {
+        /* for now the leader is always rank 0 in the communicator */
+        module->leader = ompi_osc_rdma_module_peer (module, 0);
+
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_INFO, "finished creating osc/rdma window with id %d",
+                         ompi_comm_get_cid(module->comm));
+    }
+
+
+    return ret;
+}
+
+
 static char* ompi_osc_rdma_set_no_lock_info(opal_infosubscriber_t *obj, char *key, char *value)
 {
 
@@ -1337,3 +1553,5 @@ static char* ompi_osc_rdma_set_no_lock_info(opal_infosubscriber_t *obj, char *ke
  */
     return module->no_locks ? "true" : "false";
 }
+
+
