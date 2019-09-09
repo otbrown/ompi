@@ -237,13 +237,14 @@ ompi_win_create(void *base, size_t size,
     ompi_win_t *win;
     int model;
     int ret;
-
+    ompi_request_t **request;
     ret = alloc_window (comm, info, MPI_WIN_FLAVOR_CREATE, &win);
     if (OMPI_SUCCESS != ret) {
         return ret;
     }
 
-    ret = ompi_osc_base_select(win, &base, size, disp_unit, comm, info, MPI_WIN_FLAVOR_CREATE, &model);
+    ret = ompi_osc_base_select(win, &base, size, disp_unit, comm, info, MPI_WIN_FLAVOR_CREATE, 0,
+                               request, &model);
     if (OMPI_SUCCESS != ret) {
         OBJ_RELEASE(win);
         return ret;
@@ -269,13 +270,14 @@ ompi_win_allocate(size_t size, int disp_unit, opal_info_t *info,
     int model;
     int ret;
     void *base;
-
+    ompi_request_t **request;
     ret = alloc_window (comm, info, MPI_WIN_FLAVOR_ALLOCATE, &win);
     if (OMPI_SUCCESS != ret) {
         return ret;
     }
 
-    ret = ompi_osc_base_select(win, &base, size, disp_unit, comm, info, MPI_WIN_FLAVOR_ALLOCATE, &model);
+    ret = ompi_osc_base_select(win, &base, size, disp_unit, comm, info, MPI_WIN_FLAVOR_ALLOCATE, 0, 
+                               request, &model);
     if (OMPI_SUCCESS != ret) {
         OBJ_RELEASE(win);
         return ret;
@@ -302,13 +304,14 @@ ompi_win_allocate_shared(size_t size, int disp_unit, opal_info_t *info,
     int model;
     int ret;
     void *base;
-
+    ompi_request_t **request;
     ret = alloc_window (comm, info, MPI_WIN_FLAVOR_SHARED, &win);
     if (OMPI_SUCCESS != ret) {
         return ret;
     }
 
-    ret = ompi_osc_base_select(win, &base, size, disp_unit, comm, info, MPI_WIN_FLAVOR_SHARED, &model);
+    ret = ompi_osc_base_select(win, &base, size, disp_unit, comm, info, MPI_WIN_FLAVOR_SHARED, 0,
+                               request, &model);
     if (OMPI_SUCCESS != ret) {
         OBJ_RELEASE(win);
         return ret;
@@ -333,13 +336,15 @@ ompi_win_create_dynamic(opal_info_t *info, ompi_communicator_t *comm, ompi_win_t
     ompi_win_t *win;
     int model;
     int ret;
-
+    ompi_request_t **request;
+    
     ret = alloc_window (comm, info, MPI_WIN_FLAVOR_DYNAMIC, &win);
     if (OMPI_SUCCESS != ret) {
         return ret;
     }
 
-    ret = ompi_osc_base_select(win, MPI_BOTTOM, 0, 1, comm, info, MPI_WIN_FLAVOR_DYNAMIC, &model);
+    ret = ompi_osc_base_select(win, MPI_BOTTOM, 0, 1, comm, info, MPI_WIN_FLAVOR_DYNAMIC, 0, request, 
+                               &model);
     if (OMPI_SUCCESS != ret) {
         OBJ_RELEASE(win);
         return ret;
@@ -357,7 +362,8 @@ ompi_win_create_dynamic(opal_info_t *info, ompi_communicator_t *comm, ompi_win_t
 }
 
 int
-ompi_win_icreate_dynamic(opal_info_t *info, ompi_communicator_t *comm, ompi_win_t **newwin)
+ompi_win_icreate_dynamic(opal_info_t *info, ompi_communicator_t *comm, ompi_win_t **newwin, 
+                         ompi_request_t **request)
 {
     ompi_win_t *win;
     int model;
@@ -368,7 +374,8 @@ ompi_win_icreate_dynamic(opal_info_t *info, ompi_communicator_t *comm, ompi_win_
         return ret;
     }
 
-    ret = ompi_osc_base_select(win, MPI_BOTTOM, 0, 1, comm, info, MPI_WIN_FLAVOR_DYNAMIC, &model);
+    ret = ompi_osc_base_select(win, MPI_BOTTOM, 0, 1, comm, info, MPI_WIN_FLAVOR_DYNAMIC, 1, request, 
+                               &model);
     if (OMPI_SUCCESS != ret) {
         OBJ_RELEASE(win);
         return ret;
@@ -381,7 +388,7 @@ ompi_win_icreate_dynamic(opal_info_t *info, ompi_communicator_t *comm, ompi_win_
     }
 
     *newwin = win;
-
+    
     return OMPI_SUCCESS;
 }
 
