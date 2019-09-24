@@ -68,13 +68,21 @@ static int ompi_osc_rdma_component_finalize (void);
 static int ompi_osc_rdma_component_query (struct ompi_win_t *win, void **base, size_t size, int disp_unit,
                                           struct ompi_communicator_t *comm, struct opal_info_t *info,
                                           int flavor);
-static int ompi_osc_rdma_component_select (struct ompi_win_t *win, void **base, size_t size, int disp_unit,
-                                           struct ompi_communicator_t *comm, struct opal_info_t *info,
-                                           int flavor, int *model);
+static int ompi_osc_rdma_component_select (struct ompi_win_t *win, void **base, size_t size, 
+                                           int disp_unit, struct ompi_communicator_t *comm,
+                                           struct opal_info_t *info, int flavor, int *model);
+
 static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base, size_t size,
                                             int disp_unit, struct ompi_communicator_t *comm, 
+                                            struct ompi_communicator_t **newcomm,
                                             struct opal_info_t *info, int flavor, 
                                             struct ompi_request_t **request, int *model);
+
+static int ompi_osc_rdma_component_complete_iselect(struct ompi_win_t *win, void **base,
+                                                    size_t size, int disp_unit,
+                                                    struct ompi_communicator_t *comm, 
+                                                    struct opal_info_t *info, int flavor,
+                                                    struct ompi_request_t **request, int *model);
 
 #if 0  // stale code?
 static int ompi_osc_rdma_set_info (struct ompi_win_t *win, struct opal_info_t *info);
@@ -111,6 +119,7 @@ ompi_osc_rdma_component_t mca_osc_rdma_component = {
         .osc_query = ompi_osc_rdma_component_query,
         .osc_select = ompi_osc_rdma_component_select,
         .osc_iselect = ompi_osc_rdma_component_iselect,
+        .osc_complete_iselect = ompi_osc_rdma_component_complete_iselect,
         .osc_finalize = ompi_osc_rdma_component_finalize
     }
 };
@@ -1309,15 +1318,48 @@ static int ompi_osc_rdma_component_select (struct ompi_win_t *win, void **base, 
 }
 
 
+
+
 static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base, size_t size,
                                             int disp_unit, struct ompi_communicator_t *comm, 
+                                            struct ompi_communicator_t **newcomm,
                                             struct opal_info_t *info, int flavor,
                                             struct ompi_request_t **request, int *model)
 {
+    int world_size = ompi_comm_size (comm);
+    int ret;
+    ompi_communicator_t *ncomm;
+    ompi_request_t *req;
+
+    /* the osc/sm component is the exclusive provider for support for shared
+     * memory windows */
+    if (MPI_WIN_FLAVOR_SHARED == flavor) {
+        return OMPI_ERR_NOT_SUPPORTED;
+    }
+
+    /* dup the communicator */
+    ret = ompi_comm_idup(comm, &ncomm, &req);
+    if(OMPI_SUCCESS != ret){
+        ompi_osc_rdma_free (win);
+        return ret;
+    }
+
+    *request = req;
+    *newcomm = ncomm;
+
+    return OMPI_SUCCESS;
+}
+
+
+/* This is expected to be called only when idup is complete, i.e.ompi_osc_rdma_component_iselect */
+static int ompi_osc_rdma_component_complete_iselect(struct ompi_win_t *win, void **base,
+                                                    size_t size, int disp_unit,
+                                                    struct ompi_communicator_t *comm, 
+                                                    struct opal_info_t *info, int flavor,
+                                                    struct ompi_request_t **request, int *model )
+{
+
     ompi_osc_rdma_module_t *module = NULL;
-    ompi_osc_rdma_request_t *rdma_request;
-    ompi_osc_rdma_peer_t *peer;
-    
     int world_size = ompi_comm_size (comm);
     int init_limit = 256;
     int ret;
@@ -1367,7 +1409,8 @@ static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base,
                 return ret;
             }
         } else {
-            module->outstanding_lock_array = calloc (world_size, sizeof (module->outstanding_lock_array[0]));
+            module->outstanding_lock_array = calloc (world_size, 
+                                                     sizeof (module->outstanding_lock_array[0]));
             if (NULL == module->outstanding_lock_array) {
                 ompi_osc_rdma_free (win);
                 return OMPI_ERR_OUT_OF_RESOURCE;
@@ -1375,20 +1418,11 @@ static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base,
         }
     }
     
-    OMPI_OSC_RDMA_REQUEST_ALLOC(module, peer, rdma_request);
-    rdma_request->type = OMPI_OSC_RDMA_TYPE_WIN;
+    /* communicator has been previously duplicated */
+    module->comm = comm;
 
-    ret = ompi_comm_idup(comm, &module->comm, request);
-    if(OMPI_SUCCESS != ret){
-        ompi_osc_rdma_free (win);
-        OMPI_OSC_RDMA_REQUEST_RETURN(rdma_request);
-        return ret;
-    }
-    
-    //*request = (ompi_request_t *) rdma_request;
-    
-    /* OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_INFO, "creating osc/rdma window of flavor %d with id %d",
-       flavor, ompi_comm_get_cid(module->comm)); */
+    OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_INFO, "creating osc/rdma window of flavor %d with id %d",
+                     flavor, ompi_comm_get_cid(module->comm));
 
     /* peer data */
     if (world_size > init_limit) {
@@ -1417,7 +1451,7 @@ static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base,
 
     module->region_size = module->selected_btl->btl_registration_handle_size + 
         sizeof (ompi_osc_rdma_region_t);
-    
+
     module->state_size = sizeof (ompi_osc_rdma_state_t);
 
     if (MPI_WIN_FLAVOR_DYNAMIC != module->flavor) {
@@ -1425,15 +1459,11 @@ static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base,
     } else {
         module->state_size += mca_osc_rdma_component.max_attach * module->region_size;
     }
-/*
- * These are the info's that this module is interested in
- */
+    /*
+     * These are the info's that this module is interested in
+     */
     opal_infosubscribe_subscribe(&win->super, "no_locks", "false", ompi_osc_rdma_set_no_lock_info);
 
-/*
- * TODO: same_size, same_disp_unit have w_flag entries, but do not appear
- * to be used anywhere.  If that changes, they should be subscribed
- */
 
     /* fill in the function pointer part */
     memcpy(&module->super, &ompi_osc_rdma_module_rdma_template, sizeof(module->super));
@@ -1457,11 +1487,10 @@ static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base,
         ompi_osc_rdma_free (win);
         return ret;
     }
-
+    
     if (MPI_WIN_FLAVOR_DYNAMIC == flavor) {
         /* allocate space to store local btl handles for attached regions */
-        module->dynamic_handles = (ompi_osc_rdma_handle_t *) calloc (mca_osc_rdma_component.max_attach,
-                                                                     sizeof (module->dynamic_handles[0]));
+        module->dynamic_handles = (ompi_osc_rdma_handle_t *) calloc (mca_osc_rdma_component.max_attach, sizeof (module->dynamic_handles[0]));
         if (NULL == module->dynamic_handles) {
             ompi_osc_rdma_free (win);
             return OMPI_ERR_OUT_OF_RESOURCE;
@@ -1509,14 +1538,15 @@ static int ompi_osc_rdma_component_iselect (struct ompi_win_t *win, void **base,
     } else {
         /* for now the leader is always rank 0 in the communicator */
         module->leader = ompi_osc_rdma_module_peer (module, 0);
-
+        
         OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_INFO, "finished creating osc/rdma window with id %d",
                          ompi_comm_get_cid(module->comm));
     }
-
-
+    
     return ret;
 }
+
+
 
 
 static char* ompi_osc_rdma_set_no_lock_info(opal_infosubscriber_t *obj, char *key, char *value)
