@@ -133,7 +133,7 @@ ompi_osc_base_iselect(ompi_win_t *win,
 }
 
    
-int ompi_osc_complete_base_iselect(ompi_win_t *win,
+int ompi_osc_base_complete_iselect(ompi_win_t *win,
                                   void **base,
                                   size_t size,
                                   int disp_unit,

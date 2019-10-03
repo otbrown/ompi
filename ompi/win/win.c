@@ -399,7 +399,7 @@ ompi_complete_win_icreate_dynamic(opal_info_t *info, ompi_communicator_t *comm, 
     int model;
     ompi_request_t *req;
     ompi_win_t *win;
-    ret = ompi_osc_complete_base_iselect(win, MPI_BOTTOM, 0, 1, comm, info, 
+    ret = ompi_osc_base_complete_iselect(win, MPI_BOTTOM, 0, 1, comm, info, 
                                         MPI_WIN_FLAVOR_DYNAMIC, &req, &model);
     
     ret = config_window(MPI_BOTTOM, 0, 1, MPI_WIN_FLAVOR_DYNAMIC, model, win);

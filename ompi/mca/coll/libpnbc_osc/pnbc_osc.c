@@ -648,7 +648,9 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
      case TRY_GET:
         NBC_DEBUG(5,"  TRY_GET (offset %li) ", offset);
         NBC_GET_BYTES(ptr,trygetargs);
-        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, trygetargs.target_count, trygetargs.target_datatype, handle->tag);
+        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n",
+                  trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, trygetargs.target_count, 
+                  trygetargs.target_datatype, handle->tag);
         /* get an additional request */
         handle->req_count++;
         /* get buffer */
