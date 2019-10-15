@@ -303,17 +303,19 @@ int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, MPI_Dat
                                  schedule, barrier);
 }
 
-int NBC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, 
+                    NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, false, schedule, barrier);
 }
 
-int NBC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, 
+                          NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, true, schedule, barrier);
 }
 
 /* this function puts an operation into the schedule */
-int NBC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int count, MPI_Datatype datatype,
-                  MPI_Op op, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int count, 
+                  MPI_Datatype datatype, MPI_Op op, NBC_Schedule *schedule, bool barrier) {
   NBC_Args_op op_args;
   int ret;
 
