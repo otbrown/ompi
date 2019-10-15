@@ -341,8 +341,9 @@ int NBC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int 
 }
 
 /* this function puts a copy into the schedule */
-int NBC_Sched_copy (void *src, char tmpsrc, int srccount, MPI_Datatype srctype, void *tgt, char tmptgt, int tgtcount,
-                    MPI_Datatype tgttype, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_copy (void *src, char tmpsrc, int srccount, MPI_Datatype srctype, 
+                    void *tgt, char tmptgt, int tgtcount, MPI_Datatype tgttype, 
+                    NBC_Schedule *schedule, bool barrier) {
   NBC_Args_copy copy_args;
   int ret;
 
@@ -369,8 +370,8 @@ int NBC_Sched_copy (void *src, char tmpsrc, int srccount, MPI_Datatype srctype, 
 }
 
 /* this function puts a unpack into the schedule */
-int NBC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype datatype, void *outbuf, char tmpoutbuf,
-                      NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype datatype, 
+                      void *outbuf, char tmpoutbuf, NBC_Schedule *schedule, bool barrier) {
   NBC_Args_unpack unpack_args;
   int ret;
 
@@ -507,7 +508,8 @@ int NBC_Progress(NBC_Handle *handle) {
     }
 
     /* adjust delim to start of current round */
-    NBC_DEBUG(5, "NBC_Progress: going in schedule %p to row-offset: %li\n", handle->schedule, handle->row_offset);
+    NBC_DEBUG(5, "NBC_Progress: going in schedule %p to row-offset: %li\n",
+              handle->schedule, handle->row_offset);
     delim = handle->schedule->data + handle->row_offset;
     NBC_DEBUG(10, "delim: %p\n", delim);
     nbc_get_round_size(delim, &size);
@@ -650,7 +652,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
      case TRY_GET:
         NBC_DEBUG(5,"  TRY_GET (offset %li) ", offset);
         NBC_GET_BYTES(ptr,trygetargs);
-        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, trygetargs.target_count, trygetargs.target_datatype, handle->tag);
+        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, 
+                  trygetargs.target, trygetargs.target_count, trygetargs.target_datatype, handle->tag);
         /* get an additional request */
         handle->req_count++;
         /* get buffer */
@@ -762,7 +765,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
 
         handle->req_array = tmp;
 
-        res = MCA_PML_CALL(irecv(buf1, recvargs.count, recvargs.datatype, recvargs.source, handle->tag, recvargs.local?handle->comm->c_local_comm:handle->comm,
+        res = MCA_PML_CALL(irecv(buf1, recvargs.count, recvargs.datatype, recvargs.source, 
+                                 handle->tag, recvargs.local?handle->comm->c_local_comm:handle->comm,
                                  handle->req_array+handle->req_count-1));
         if (OMPI_SUCCESS != res) {
           NBC_Error("Error in MPI_Irecv(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, recvargs.count,
@@ -865,52 +869,6 @@ void NBC_Return_handle(ompi_coll_libnbc_request_t *request) {
 
 int  NBC_Init_comm(MPI_Comm comm, NBC_Comminfo *comminfo) {
   comminfo->tag= MCA_COLL_BASE_TAG_NONBLOCKING_BASE;
-
-#ifdef NBC_CACHE_SCHEDULE
-  /* initialize the NBC_ALLTOALL SchedCache tree */
-  comminfo->NBC_Dict[NBC_ALLTOALL] = hb_tree_new((dict_cmp_func)NBC_Alltoall_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_ALLTOALL] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_ALLTOALL]);
-  comminfo->NBC_Dict_size[NBC_ALLTOALL] = 0;
-  /* initialize the NBC_ALLGATHER SchedCache tree */
-  comminfo->NBC_Dict[NBC_ALLGATHER] = hb_tree_new((dict_cmp_func)NBC_Allgather_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_ALLGATHER] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_ALLGATHER]);
-  comminfo->NBC_Dict_size[NBC_ALLGATHER] = 0;
-  /* initialize the NBC_ALLREDUCE SchedCache tree */
-  comminfo->NBC_Dict[NBC_ALLREDUCE] = hb_tree_new((dict_cmp_func)NBC_Allreduce_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_ALLREDUCE] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_ALLREDUCE]);
-  comminfo->NBC_Dict_size[NBC_ALLREDUCE] = 0;
-  /* initialize the NBC_BARRIER SchedCache tree - is not needed -
-   * schedule is hung off directly */
-  comminfo->NBC_Dict_size[NBC_BARRIER] = 0;
-  /* initialize the NBC_BCAST SchedCache tree */
-  comminfo->NBC_Dict[NBC_BCAST] = hb_tree_new((dict_cmp_func)NBC_Bcast_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_BCAST] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_BCAST]);
-  comminfo->NBC_Dict_size[NBC_BCAST] = 0;
-  /* initialize the NBC_GATHER SchedCache tree */
-  comminfo->NBC_Dict[NBC_GATHER] = hb_tree_new((dict_cmp_func)NBC_Gather_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_GATHER] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_GATHER]);
-  comminfo->NBC_Dict_size[NBC_GATHER] = 0;
-  /* initialize the NBC_REDUCE SchedCache tree */
-  comminfo->NBC_Dict[NBC_REDUCE] = hb_tree_new((dict_cmp_func)NBC_Reduce_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_REDUCE] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_REDUCE]);
-  comminfo->NBC_Dict_size[NBC_REDUCE] = 0;
-  /* initialize the NBC_SCAN SchedCache tree */
-  comminfo->NBC_Dict[NBC_SCAN] = hb_tree_new((dict_cmp_func)NBC_Scan_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_SCAN] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_SCAN]);
-  comminfo->NBC_Dict_size[NBC_SCAN] = 0;
-  /* initialize the NBC_SCATTER SchedCache tree */
-  comminfo->NBC_Dict[NBC_SCATTER] = hb_tree_new((dict_cmp_func)NBC_Scatter_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_SCATTER] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_SCATTER]);
-  comminfo->NBC_Dict_size[NBC_SCATTER] = 0;
-#endif
 
   return OMPI_SUCCESS;
 }
