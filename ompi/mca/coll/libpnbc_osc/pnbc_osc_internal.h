@@ -133,6 +133,7 @@ typedef struct {
   bool local;
   int lock_type;
   int assert;
+  NBC_Lock_status lock_status;
 } NBC_Args_try_get;  
 
 /* the send argument struct */
