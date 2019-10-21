@@ -396,6 +396,8 @@ struct ompi_osc_base_module_3_0_0_t {
 
     ompi_osc_base_module_lock_fn_t osc_lock;
     ompi_osc_base_module_unlock_fn_t osc_unlock;
+    ompi_osc_base_module_lock_fn_t osc_try_lock;
+    ompi_osc_base_module_unlock_fn_t osc_try_unlock;
     ompi_osc_base_module_lock_all_fn_t osc_lock_all;
     ompi_osc_base_module_unlock_all_fn_t osc_unlock_all;
 

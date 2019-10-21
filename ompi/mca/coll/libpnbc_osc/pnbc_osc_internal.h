@@ -86,9 +86,15 @@ typedef enum {
   COPY,
   UNPACK,
   PUT,
-  GET
+  GET,
+  TRY_GET
 } NBC_Fn_type;
-
+  
+typedef enum {
+  LOCKED,
+  UNLOCKED
+} NBC_Lock_status;
+  
 /* the put argument struct */
 typedef struct {
   NBC_Fn_type type;
@@ -115,6 +121,21 @@ typedef struct {
   bool local;
 } NBC_Args_get;
   
+typedef struct {
+  NBC_Fn_type type;
+  int origin_count;
+  int target_count;
+  const void *buf;
+  MPI_Datatype origin_datatype;
+  MPI_Datatype target_datatype;
+  int target;
+  char tmpbuf;
+  bool local;
+  int lock_type;
+  int assert;
+  NBC_Lock_status lock_status;
+} NBC_Args_try_get;  
+
 /* the send argument struct */
 typedef struct {
   NBC_Fn_type type;
@@ -189,7 +210,10 @@ int NBC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype 
 int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, 
                          MPI_Datatype origin_datatype, int target, NBC_Schedule *schedule,
                          bool barrier);
-  
+ /* try_get */
+  int NBC_Sched_try_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
+                         int target, int target_count,  MPI_Datatype target_datatype, 
+                         NBC_Schedule *schedule, int lock_type, int assert, bool barrier); 
   /* Send */
 int NBC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier);
 int NBC_Sched_local_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,NBC_Schedule *schedule, bool barrier);
@@ -373,6 +397,10 @@ static inline void nbc_get_round_size (char *p, unsigned long *size) {
     case GET:
       /*printf("found a GET at offset %li\n", (long)p-(long)schedule); */
       offset += sizeof(NBC_Args_get);
+      break;
+    case TRY_GET:
+      /*printf("found a TRY_GET at offset %li\n", (long)p-(long)schedule); */
+      offset += sizeof(NBC_Args_tryget);
       break; 
     case SEND:
       /*printf("found a SEND at offset %li\n", (long)p-(long)schedule); */

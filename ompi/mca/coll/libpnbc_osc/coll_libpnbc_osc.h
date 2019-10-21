@@ -95,14 +95,6 @@ struct ompi_coll_libnbc_module_t {
     opal_mutex_t mutex;
     bool comm_registered;
     int tag;
-#ifdef NBC_CACHE_SCHEDULE
-  void *NBC_Dict[NBC_NUM_COLL]; /* this should point to a struct
-                                      hb_tree, but since this is a
-                                      public header-file, this would be
-                                      an include mess :-(. So let's void
-                                      it ...*/
-  int NBC_Dict_size[NBC_NUM_COLL];
-#endif
 };
 typedef struct ompi_coll_libnbc_module_t ompi_coll_libnbc_module_t;
 OBJ_CLASS_DECLARATION(ompi_coll_libnbc_module_t);

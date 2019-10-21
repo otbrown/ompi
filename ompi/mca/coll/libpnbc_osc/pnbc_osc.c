@@ -174,7 +174,7 @@ static int NBC_Sched_get_internal (const void* buf, char tmpbuf, int origin_coun
   get_args.target_count = target_count;
   get_args.target_datatype = target_datatype;
   get_args.local = local;
-
+  
   /* append to the round-schedule */
   ret = nbc_schedule_round_append (schedule, &get_args, sizeof (get_args), barrier);
   if (OMPI_SUCCESS != ret) {
@@ -191,6 +191,46 @@ int NBC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype 
                    NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_get_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
                                  target_datatype, false, schedule, barrier);
+}
+/* this function puts a get into the schedule */
+static int NBC_Sched_try_get_internal (const void* buf, char tmpbuf, int origin_count, 
+                                       MPI_Datatype origin_datatype, int target, int target_count, 
+                                       MPI_Datatype target_datatype, bool local, 
+                                       NBC_Schedule *schedule, int lock_type, int assert,
+                                       bool barrier) {
+  NBC_Args_try_get try_get_args;
+  int ret;
+
+  /* store the passed arguments */
+  try_get_args.type = TRY_GET;
+  try_get_args.buf = buf;
+  try_get_args.tmpbuf = tmpbuf;   /* TODO: most likely we don't need this for single sided */
+  try_get_args.origin_count = origin_count;
+  try_get_args.origin_datatype = origin_datatype;
+  try_get_args.target = target;
+  try_get_args.target_count = target_count;
+  try_get_args.target_datatype = target_datatype;
+  try_get_args.local = local;
+  try_get_args.lock_type = lock_type;
+  try_get_args.assert = assert;
+  try_get_args.lock_status = UNLOCKED;
+  
+  /* append to the round-schedule */
+  ret = nbc_schedule_round_append (schedule, &try_get_args, sizeof (try_get_args), barrier);
+  if (OMPI_SUCCESS != ret) {
+    return ret;
+  }
+
+  NBC_DEBUG(10, "added try_get - ends at byte %i\n", nbc_schedule_get_size (schedule));
+
+  return OMPI_SUCCESS;
+}
+
+int NBC_Sched_try_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
+                       int target, int target_count,  MPI_Datatype target_datatype, 
+                       NBC_Schedule *schedule, int lock_type, int assert, bool barrier) {
+  return NBC_Sched_try_get_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
+                                     target_datatype, false, schedule, lock_type, assert, barrier);
 }
 
 /* this function puts a send into the schedule */
@@ -264,17 +304,19 @@ int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, MPI_Dat
                                  schedule, barrier);
 }
 
-int NBC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, 
+                    NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, false, schedule, barrier);
 }
 
-int NBC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, 
+                          NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, true, schedule, barrier);
 }
 
 /* this function puts an operation into the schedule */
-int NBC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int count, MPI_Datatype datatype,
-                  MPI_Op op, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int count, 
+                  MPI_Datatype datatype, MPI_Op op, NBC_Schedule *schedule, bool barrier) {
   NBC_Args_op op_args;
   int ret;
 
@@ -300,8 +342,9 @@ int NBC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int 
 }
 
 /* this function puts a copy into the schedule */
-int NBC_Sched_copy (void *src, char tmpsrc, int srccount, MPI_Datatype srctype, void *tgt, char tmptgt, int tgtcount,
-                    MPI_Datatype tgttype, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_copy (void *src, char tmpsrc, int srccount, MPI_Datatype srctype, 
+                    void *tgt, char tmptgt, int tgtcount, MPI_Datatype tgttype, 
+                    NBC_Schedule *schedule, bool barrier) {
   NBC_Args_copy copy_args;
   int ret;
 
@@ -328,8 +371,8 @@ int NBC_Sched_copy (void *src, char tmpsrc, int srccount, MPI_Datatype srctype, 
 }
 
 /* this function puts a unpack into the schedule */
-int NBC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype datatype, void *outbuf, char tmpoutbuf,
-                      NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype datatype, 
+                      void *outbuf, char tmpoutbuf, NBC_Schedule *schedule, bool barrier) {
   NBC_Args_unpack unpack_args;
   int ret;
 
@@ -466,7 +509,8 @@ int NBC_Progress(NBC_Handle *handle) {
     }
 
     /* adjust delim to start of current round */
-    NBC_DEBUG(5, "NBC_Progress: going in schedule %p to row-offset: %li\n", handle->schedule, handle->row_offset);
+    NBC_DEBUG(5, "NBC_Progress: going in schedule %p to row-offset: %li\n",
+              handle->schedule, handle->row_offset);
     delim = handle->schedule->data + handle->row_offset;
     NBC_DEBUG(10, "delim: %p\n", delim);
     nbc_get_round_size(delim, &size);
@@ -509,6 +553,7 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
   NBC_Fn_type type;
   NBC_Args_put      putargs;
   NBC_Args_get      getargs;
+  NBC_Args_try_get  trygetargs;
   NBC_Args_send     sendargs;
   NBC_Args_recv     recvargs;
   NBC_Args_op         opargs;
@@ -605,6 +650,65 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         Iget_time += MPI_Wtime();
 #endif
         break;
+     case TRY_GET:
+        NBC_DEBUG(5,"  TRY_GET (offset %li) ", offset);
+        NBC_GET_BYTES(ptr,trygetargs);
+        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, trygetargs.target_count, trygetargs.target_datatype, handle->tag);
+
+        /* get an additional request */
+        handle->req_count++;
+        /* get buffer */
+        if(trygetargs.tmpbuf) {
+          buf1=(char*)handle->tmpbuf+(long)trygetargs.buf;
+        } else {
+          buf1=(void *)trygetargs.buf;
+        }
+#ifdef NBC_TIMING
+        Iget_time -= MPI_Wtime();
+#endif
+        
+        /* [state is unlocked] -> we try to lock */
+        if( UNLOCKED == trygetargs.lock_status ){
+          
+          res = handle->win->w_osc_module->osc_try_lock(trygetargs.lock_type, trygetargs.target, 
+                                                        trygetargs.assert, handle->win);
+          if(OMPI_SUCCESS == res){
+            trygetargs.lock_status = LOCKED;
+            res = handle->win->w_osc_module->osc_get(buf1, trygetargs.origin_count, 
+                                                     trygetargs.origin_datatype,
+                                                     trygetargs.target, 0, trygetargs.target_count,
+                                                     trygetargs.target_datatype, handle->win);
+            if (OMPI_SUCCESS != res){
+              /* return error code */
+              NBC_Error ("Error in MPI_try_get(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)",
+                         (unsigned long)buf1, 
+                         trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, 
+                         trygetargs.target_count, trygetargs.target_datatype,  handle->tag, 
+                         (unsigned long)handle->comm, res);
+              
+              return res;
+            }
+          }else{
+            
+            return res;
+          }
+        }
+        
+        /* [state is locked] */
+        if( LOCKED == trygetargs.lock_status){
+          res = handle->win->w_osc_module->osc_try_unlock(trygetargs.target, handle->win);
+          if (OMPI_SUCCESS != res){
+            return res;
+          }else{
+            trygetargs.lock_status = UNLOCKED;
+          }
+          
+        }
+#ifdef NBC_TIMING
+        Iget_time += MPI_Wtime();
+#endif
+   
+        break;
       case SEND:
         NBC_DEBUG(5,"  SEND (offset %li) ", offset);
         NBC_GET_BYTES(ptr,sendargs);
@@ -663,7 +767,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
 
         handle->req_array = tmp;
 
-        res = MCA_PML_CALL(irecv(buf1, recvargs.count, recvargs.datatype, recvargs.source, handle->tag, recvargs.local?handle->comm->c_local_comm:handle->comm,
+        res = MCA_PML_CALL(irecv(buf1, recvargs.count, recvargs.datatype, recvargs.source, 
+                                 handle->tag, recvargs.local?handle->comm->c_local_comm:handle->comm,
                                  handle->req_array+handle->req_count-1));
         if (OMPI_SUCCESS != res) {
           NBC_Error("Error in MPI_Irecv(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, recvargs.count,
@@ -766,52 +871,6 @@ void NBC_Return_handle(ompi_coll_libnbc_request_t *request) {
 
 int  NBC_Init_comm(MPI_Comm comm, NBC_Comminfo *comminfo) {
   comminfo->tag= MCA_COLL_BASE_TAG_NONBLOCKING_BASE;
-
-#ifdef NBC_CACHE_SCHEDULE
-  /* initialize the NBC_ALLTOALL SchedCache tree */
-  comminfo->NBC_Dict[NBC_ALLTOALL] = hb_tree_new((dict_cmp_func)NBC_Alltoall_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_ALLTOALL] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_ALLTOALL]);
-  comminfo->NBC_Dict_size[NBC_ALLTOALL] = 0;
-  /* initialize the NBC_ALLGATHER SchedCache tree */
-  comminfo->NBC_Dict[NBC_ALLGATHER] = hb_tree_new((dict_cmp_func)NBC_Allgather_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_ALLGATHER] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_ALLGATHER]);
-  comminfo->NBC_Dict_size[NBC_ALLGATHER] = 0;
-  /* initialize the NBC_ALLREDUCE SchedCache tree */
-  comminfo->NBC_Dict[NBC_ALLREDUCE] = hb_tree_new((dict_cmp_func)NBC_Allreduce_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_ALLREDUCE] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_ALLREDUCE]);
-  comminfo->NBC_Dict_size[NBC_ALLREDUCE] = 0;
-  /* initialize the NBC_BARRIER SchedCache tree - is not needed -
-   * schedule is hung off directly */
-  comminfo->NBC_Dict_size[NBC_BARRIER] = 0;
-  /* initialize the NBC_BCAST SchedCache tree */
-  comminfo->NBC_Dict[NBC_BCAST] = hb_tree_new((dict_cmp_func)NBC_Bcast_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_BCAST] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_BCAST]);
-  comminfo->NBC_Dict_size[NBC_BCAST] = 0;
-  /* initialize the NBC_GATHER SchedCache tree */
-  comminfo->NBC_Dict[NBC_GATHER] = hb_tree_new((dict_cmp_func)NBC_Gather_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_GATHER] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_GATHER]);
-  comminfo->NBC_Dict_size[NBC_GATHER] = 0;
-  /* initialize the NBC_REDUCE SchedCache tree */
-  comminfo->NBC_Dict[NBC_REDUCE] = hb_tree_new((dict_cmp_func)NBC_Reduce_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_REDUCE] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_REDUCE]);
-  comminfo->NBC_Dict_size[NBC_REDUCE] = 0;
-  /* initialize the NBC_SCAN SchedCache tree */
-  comminfo->NBC_Dict[NBC_SCAN] = hb_tree_new((dict_cmp_func)NBC_Scan_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_SCAN] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_SCAN]);
-  comminfo->NBC_Dict_size[NBC_SCAN] = 0;
-  /* initialize the NBC_SCATTER SchedCache tree */
-  comminfo->NBC_Dict[NBC_SCATTER] = hb_tree_new((dict_cmp_func)NBC_Scatter_args_compare, NBC_SchedCache_args_delete_key_dummy, NBC_SchedCache_args_delete);
-  if(comminfo->NBC_Dict[NBC_SCATTER] == NULL) { printf("Error in hb_tree_new()\n"); return OMPI_ERROR;; }
-  NBC_DEBUG(1, "added tree at address %lu\n", (unsigned long)comminfo->NBC_Dict[NBC_SCATTER]);
-  comminfo->NBC_Dict_size[NBC_SCATTER] = 0;
-#endif
 
   return OMPI_SUCCESS;
 }
@@ -1004,15 +1063,3 @@ int NBC_Schedule_request_win(NBC_Schedule *schedule, ompi_communicator_t *comm,
   return OMPI_SUCCESS;
 }
 
-#ifdef NBC_CACHE_SCHEDULE
-void NBC_SchedCache_args_delete_key_dummy(void *k) {
-    /* do nothing because the key and the data element are identical :-)
-     * both (the single one :) is freed in NBC_<COLLOP>_args_delete() */
-}
-
-void NBC_SchedCache_args_delete(void *entry) {
-  struct NBC_dummyarg *tmp = (struct NBC_dummyarg*)entry;
-  OBJ_RELEASE(tmp->schedule);
-  free(entry);
-}
-#endif
