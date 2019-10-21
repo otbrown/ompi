@@ -217,7 +217,7 @@ int ompi_mpi_errcode_init (void)
     CONSTRUCT_ERRCODE( ompi_err_rma_shared, MPI_ERR_RMA_SHARED, "MPI_ERR_RMA_SHARED: Memory cannot be shared" );
     CONSTRUCT_ERRCODE( ompi_t_err_invalid, MPI_T_ERR_INVALID, "MPI_T_ERR_INVALID: Invalid use of the interface or bad parameter value(s)" );
     CONSTRUCT_ERRCODE( ompi_t_err_invalid_name, MPI_T_ERR_INVALID_NAME, "MPI_T_ERR_INVALID_NAME: The variable or category name is invalid" );
-    CONSTRUCT_ERRCODE( ompi_err_rma_nb_pending, MPI_ERR_RMA_NB_PENDING, "MPI_ERR_RMA_NB_PENDING: rma nonblocking pending operation" );
+    /* CONSTRUCT_ERRCODE( ompi_err_rma_nb_pending, MPI_ERR_RMA_NB_PENDING, "MPI_ERR_RMA_NB_PENDING: rma nonblocking pending operation" ); */
 
     /* Per MPI-3 p353:27-32, MPI_LASTUSEDCODE must be >=
        MPI_ERR_LASTCODE.  So just start it as == MPI_ERR_LASTCODE. */
