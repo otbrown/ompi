@@ -89,7 +89,12 @@ typedef enum {
   GET,
   TRY_GET
 } NBC_Fn_type;
-
+  
+typedef enum {
+  LOCKED,
+  UNLOCKED
+} NBC_Lock_status;
+  
 /* the put argument struct */
 typedef struct {
   NBC_Fn_type type;
@@ -128,6 +133,7 @@ typedef struct {
   bool local;
   int lock_type;
   int assert;
+  NBC_Lock_status lock_status;
 } NBC_Args_try_get;  
 
 /* the send argument struct */
@@ -391,6 +397,10 @@ static inline void nbc_get_round_size (char *p, unsigned long *size) {
     case GET:
       /*printf("found a GET at offset %li\n", (long)p-(long)schedule); */
       offset += sizeof(NBC_Args_get);
+      break;
+    case TRY_GET:
+      /*printf("found a TRY_GET at offset %li\n", (long)p-(long)schedule); */
+      offset += sizeof(NBC_Args_tryget);
       break; 
     case SEND:
       /*printf("found a SEND at offset %li\n", (long)p-(long)schedule); */
