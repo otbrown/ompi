@@ -400,7 +400,7 @@ static inline void nbc_get_round_size (char *p, unsigned long *size) {
       break;
     case TRY_GET:
       /*printf("found a TRY_GET at offset %li\n", (long)p-(long)schedule); */
-      offset += sizeof(NBC_Args_tryget);
+      offset += sizeof(NBC_Args_try_get);
       break; 
     case SEND:
       /*printf("found a SEND at offset %li\n", (long)p-(long)schedule); */
