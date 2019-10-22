@@ -1490,7 +1490,8 @@ static int ompi_osc_rdma_component_complete_iselect(struct ompi_win_t *win, void
     
     if (MPI_WIN_FLAVOR_DYNAMIC == flavor) {
         /* allocate space to store local btl handles for attached regions */
-        module->dynamic_handles = (ompi_osc_rdma_handle_t *) calloc (mca_osc_rdma_component.max_attach, sizeof (module->dynamic_handles[0]));
+        module->dynamic_handles = (ompi_osc_rdma_handle_t *) calloc (mca_osc_rdma_component.max_attach,
+                                                                     sizeof (module->dynamic_handles[0]));
         if (NULL == module->dynamic_handles) {
             ompi_osc_rdma_free (win);
             return OMPI_ERR_OUT_OF_RESOURCE;
