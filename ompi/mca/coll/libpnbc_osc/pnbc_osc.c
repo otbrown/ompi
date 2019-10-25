@@ -391,6 +391,20 @@ int NBC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype dataty
 
   return OMPI_SUCCESS;
 }
+/* this function adds win_ifree into the schedule */
+int NBC_Sched_ifree ( NBC_Schedule *schedule, bool barrier) {
+  int ret;
+  NBC_Args_win_ifree wifree_args;
+  /* append to the round-schedule */
+  ret = nbc_schedule_round_append (schedule, &wifree_args, sizeof(wifree_args), barrier);
+  if (OMPI_SUCCESS != ret) {
+    return ret;
+  }
+
+  NBC_DEBUG(10, "added ifree - ends at byte %i\n", nbc_schedule_get_size (schedule));
+
+  return OMPI_SUCCESS;
+}
 
 /* this function ends a round of a schedule */
 int NBC_Sched_barrier (NBC_Schedule *schedule) {
@@ -465,7 +479,8 @@ int NBC_Progress(NBC_Handle *handle) {
         ompi_request_t *subreq = handle->req_array[handle->req_count - 1];
         if (REQUEST_COMPLETE(subreq)) {
             if(OPAL_UNLIKELY( OMPI_SUCCESS != subreq->req_status.MPI_ERROR )) {
-                NBC_Error ("MPI Error in NBC subrequest %p : %d", subreq, subreq->req_status.MPI_ERROR);
+                NBC_Error ("MPI Error in NBC subrequest %p : %d", subreq,
+                           subreq->req_status.MPI_ERROR);
                 /* copy the error code from the underlying request and let the
                  * round finish */
                 handle->super.req_status.MPI_ERROR = subreq->req_status.MPI_ERROR;
@@ -505,7 +520,8 @@ int NBC_Progress(NBC_Handle *handle) {
     }
 
     /* adjust delim to start of current round */
-    NBC_DEBUG(5, "NBC_Progress: going in schedule %p to row-offset: %li\n", handle->schedule, handle->row_offset);
+    NBC_DEBUG(5, "NBC_Progress: going in schedule %p to row-offset: %li\n",
+              handle->schedule, handle->row_offset);
     delim = handle->schedule->data + handle->row_offset;
     NBC_DEBUG(10, "delim: %p\n", delim);
     nbc_get_round_size(delim, &size);
@@ -554,6 +570,7 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
   NBC_Args_op         opargs;
   NBC_Args_copy     copyargs;
   NBC_Args_unpack unpackargs;
+
   void *buf1,  *buf2;
 
   /* get round-schedule address */
@@ -567,7 +584,17 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
 
     memcpy (&type, ptr, sizeof (type));
     switch(type) {
-      //TODO
+      case WIN_IFREE:
+        NBC_DEBUG(5,"  WIN_IFREE (offset %li) ", offset);
+        /* get an additional request */
+        handle->req_count++;
+        
+#ifdef NBC_TIMING
+        Iput_time -= MPI_Wtime();
+#endif
+        res = handle->win->w_osc_module->osc_ifree(handle->win, handle->req_array +
+                                                   handle->req_count - 1);
+        break;
       case PUT:
         NBC_DEBUG(5,"  PUT (offset %li) ", offset);
         NBC_GET_BYTES(ptr,putargs);
