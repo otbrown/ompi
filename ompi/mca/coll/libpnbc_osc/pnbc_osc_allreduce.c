@@ -51,13 +51,14 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   ptrdiff_t ext, lb;
   NBC_Schedule *schedule;
   size_t size;
-
+  ompi_win_t *win;
+  ompi_request_t **request;
   enum { NBC_ARED_BINOMIAL, NBC_ARED_RING, NBC_ARED_REDSCAT_ALLGATHER } alg;
   char inplace;
   void *tmpbuf = NULL;
   ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
   ptrdiff_t span, gap;
-
+  
   NBC_IN_PLACE(sendbuf, recvbuf, inplace);
 
   rank = ompi_comm_rank (comm);
@@ -104,7 +105,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   
 
   /* algorithm selection */
-  /* note: binomial alg for now */
+  /* NOTE: binomial alg for now only implemented */
   int nprocs_pof2 = opal_next_poweroftwo(p) >> 1;
   if (libnbc_iallreduce_algorithm == 0) {
     if(p < 4 || size*count < 65536 || !ompi_op_is_commute(op) || inplace) {
@@ -135,7 +136,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
 
   /* NBC add "restart point" */
   
-    if (p == 1) {
+  if (p == 1) {
     res = NBC_Sched_copy((void *)sendbuf, false, count, datatype,
                          recvbuf, false, count, datatype, schedule, false);
   } else {
@@ -178,6 +179,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   return OMPI_SUCCESS;
 }
 
+
 int ompi_coll_libnbc_allreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                                MPI_Op op, struct ompi_communicator_t *comm,
                                ompi_request_t ** request,
@@ -197,6 +199,7 @@ int ompi_coll_libnbc_allreduce(const void* sendbuf, void* recvbuf, int count, MP
 
   return OMPI_SUCCESS;
 }
+
 
 static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count,
                                     MPI_Datatype datatype, MPI_Op op,
@@ -383,7 +386,7 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
       return res;
     }
   }
-
+  
   if (0 == vrank){
     res = NBC_Sched_copy(sendbuf, false, count, datatype, recvbuf, false, count, datatype,
                          schedule, true);
@@ -392,7 +395,7 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
     }
     
   /* end of the bcast */
-  return OMPI_SUCCESS;
+    return OMPI_SUCCESS;
 }
 
 static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datatype,
