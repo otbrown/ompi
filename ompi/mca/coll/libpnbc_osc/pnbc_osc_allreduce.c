@@ -94,7 +94,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
 
-  /* icreate a dynamic window */
+  /* icreate a dynamic window and attach to sendbuf */
   /* NBC_Icreate_dynamic() */
 
   /* add complete wait request */
@@ -328,32 +328,35 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
   ompi_request_t *req;
   int flag = 0;
   int rc;
-  
+
+  int lock_type = MPI_LOCK_SHARED;
+  int assert = 0;
   root = 0; /* this makes the code for ireduce and iallreduce nearly identical
                - could be changed to improve performance */
   
   RANK2VRANK(rank, vrank, root);
   maxr = (int)ceil((log((double)p)/LOG2));
+
   /* ensure the result ends up in recvbuf on vrank 0 */
-  if (0 == (maxr%2)) {
-    rbuf = (void *)(-gap);
-    tmprbuf = true;
-    lbuf = recvbuf;
-    tmplbuf = false;
-  } else {
-    lbuf = (void *)(-gap);
-    tmplbuf = true;
-    rbuf = recvbuf;
-    tmprbuf = false;
-    if (inplace) {
-      res = NBC_Sched_copy(rbuf, false, count, datatype,
-                           ((char *)tmpbuf) - gap, false, count, datatype,
-                           schedule, true);
-      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        return res;
-      }
-    }
-  }
+  /* if (0 == (maxr%2)) { */
+  /*   rbuf = (void *)(-gap); */
+  /*   tmprbuf = true; */
+  /*   lbuf = recvbuf; */
+  /*   tmplbuf = false; */
+  /* } else { */
+  /*   lbuf = (void *)(-gap); */
+  /*   tmplbuf = true; */
+  /*   rbuf = recvbuf; */
+  /*   tmprbuf = false; */
+  /*   if (inplace) { */
+  /*     res = NBC_Sched_copy(rbuf, false, count, datatype, */
+  /*                          ((char *)tmpbuf) - gap, false, count, datatype, */
+  /*                          schedule, true); */
+  /*     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { */
+  /*       return res; */
+  /*     } */
+  /*   } */
+  /* } */
 
   for (int r = 1, firstred = 1 ; r <= maxr ; ++r) {
     if ((vrank % (1 << r)) == 0) {
@@ -361,24 +364,30 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
       vpeer = vrank + (1 << (r - 1));
       VRANK2RANK(peer, vpeer, root)
         if (peer < p) {
-          /* we have to wait until we have the data */
-          res = NBC_Sched_recv (rbuf, tmprbuf, count, datatype, peer, schedule, true);
+          /* get the data from my peer and store it in recvbuf*/
+          res = NBC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype, schedule, lock_type,
+                                   assert, true);
+          //res = NBC_Sched_recv (rbuf, tmprbuf, count, datatype, peer, schedule, true);
           if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
             return res;
           }
 
+          /* add value to my values in my window - i.e. add the values and store them in sendbuf so they can
+            be use in the next r iteration */
+          res = NBC_Sched_op (recvbuf, false, sendbuf, false, count, datatype, op, schedule, true); 
+          
           /* this cannot be done until tmpbuf is unused :-( so barrier after the op */
-          if (firstred && !inplace) {
-            /* perform the reduce with the senbuf */
-            res = NBC_Sched_op (sendbuf, false, rbuf, tmprbuf, count, datatype, op, schedule, true);
-            firstred = 0;
-          } else {
-            /* perform the reduce in my local buffer */
-            res = NBC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op, schedule, true);
-          }
-          if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-            return res;
-          }
+          /* if (firstred && !inplace) { */
+          /*   /\* perform the reduce with the senbuf *\/ */
+          /*   res = NBC_Sched_op (sendbuf, false, rbuf, tmprbuf, count, datatype, op, schedule, true); */
+          /*   firstred = 0; */
+          /* } else { */
+          /*   /\* perform the reduce in my local buffer *\/ */
+          /*   res = NBC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op, schedule, true); */
+          /* } */
+          /* if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { */
+          /*   return res; */
+          /* } */
           /* swap left and right buffers */
           buf = rbuf; rbuf = lbuf ; lbuf = buf;
           tmprbuf ^= 1; tmplbuf ^= 1;
