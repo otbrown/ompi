@@ -500,7 +500,8 @@ int NBC_Progress(NBC_Handle *handle) {
     /* previous round had an error */
     if (OPAL_UNLIKELY(OMPI_SUCCESS != handle->super.req_status.MPI_ERROR)) {
       res = handle->super.req_status.MPI_ERROR;
-      NBC_Error("NBC_Progress: an error %d was found during schedule %p at row-offset %li - aborting the schedule\n", res, handle->schedule, handle->row_offset);
+      NBC_Error("NBC_Progress: an error %d was found during schedule %p at row-offset %li - aborting the schedule\n",
+                res, handle->schedule, handle->row_offset);
       handle->nbc_complete = true;
       if (!handle->super.req_persistent) {
         NBC_Free(handle);
