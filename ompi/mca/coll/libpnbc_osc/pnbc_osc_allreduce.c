@@ -337,27 +337,7 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
   RANK2VRANK(rank, vrank, root);
   maxr = (int)ceil((log((double)p)/LOG2));
 
-  /* ensure the result ends up in recvbuf on vrank 0 */
-  /* if (0 == (maxr%2)) { */
-  /*   rbuf = (void *)(-gap); */
-  /*   tmprbuf = true; */
-  /*   lbuf = recvbuf; */
-  /*   tmplbuf = false; */
-  /* } else { */
-  /*   lbuf = (void *)(-gap); */
-  /*   tmplbuf = true; */
-  /*   rbuf = recvbuf; */
-  /*   tmprbuf = false; */
-  /*   if (inplace) { */
-  /*     res = NBC_Sched_copy(rbuf, false, count, datatype, */
-  /*                          ((char *)tmpbuf) - gap, false, count, datatype, */
-  /*                          schedule, true); */
-  /*     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { */
-  /*       return res; */
-  /*     } */
-  /*   } */
-  /* } */
-
+  /* form a binary tree, try_get and add from children */
   for (int r = 1, firstred = 1 ; r <= maxr ; ++r) {
     if ((vrank % (1 << r)) == 0) {
       /* we have to receive this round */
@@ -376,45 +356,11 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
             be use in the next r iteration */
           res = NBC_Sched_op (recvbuf, false, sendbuf, false, count, datatype, op, schedule, true); 
           
-          /* this cannot be done until tmpbuf is unused :-( so barrier after the op */
-          /* if (firstred && !inplace) { */
-          /*   /\* perform the reduce with the senbuf *\/ */
-          /*   res = NBC_Sched_op (sendbuf, false, rbuf, tmprbuf, count, datatype, op, schedule, true); */
-          /*   firstred = 0; */
-          /* } else { */
-          /*   /\* perform the reduce in my local buffer *\/ */
-          /*   res = NBC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op, schedule, true); */
-          /* } */
-          /* if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { */
-          /*   return res; */
-          /* } */
-          /* swap left and right buffers */
-          buf = rbuf; rbuf = lbuf ; lbuf = buf;
-          tmprbuf ^= 1; tmplbuf ^= 1;
-        }
-    } else {
-      /* we have to send this round */
-      vpeer = vrank - (1 << (r - 1));
-      VRANK2RANK(peer, vpeer, root)
-        if (firstred && !inplace) {
-          /* we have to use the sendbuf in the first round .. */
-          res = NBC_Sched_send (sendbuf, false, count, datatype, peer, schedule, false);
-        } else {
-          /* and the recvbuf in all remaining rounds */
-          res = NBC_Sched_send (lbuf, tmplbuf, count, datatype, peer, schedule, false);
-        }
-
-      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        return res;
-      }
-
-      /* leave the game */
-      break;
+        } 
     }
   }
 
-  /* this is the Bcast part - copied with minor changes from nbc_ibcast.c
-   * changed: buffer -> recvbuf  */
+  /* this is the Bcast part */
   RANK2VRANK(rank, vrank, root);
 
   /* receive from the right hosts  */
@@ -422,31 +368,29 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
     for (int r = 0; r < maxr ; ++r) {
       if ((vrank >= (1 << r)) && (vrank < (1 << (r + 1)))) {
         VRANK2RANK(peer, vrank - (1 << r), root);
-        res = NBC_Sched_recv (recvbuf, false, count, datatype, peer, schedule, false);
+        /* try_get and place in recvbuf*/
+        res = NBC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype, schedule, lock_type,
+                                 assert, false);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
+        
       }
     }
-
+    
     res = NBC_Sched_barrier (schedule);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       return res;
     }
   }
 
-  if (0 == vrank) assert(lbuf == recvbuf);
-  /* now send to the right hosts */
-  for (int r = 0; r < maxr; ++r) {
-    if (((vrank + (1 << r) < p) && (vrank < (1 << r))) || (vrank == 0)) {
-      VRANK2RANK(peer, vrank + (1 << r), root);
-      res = NBC_Sched_send (recvbuf, false, count, datatype, peer, schedule, false);
-      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        return res;
-      }
+  if (0 == vrank){
+    res = NBC_Sched_copy(sendbuf, false, count, datatype, recvbuf, false, count, datatype,
+                         schedule, true);
+    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+      return res;
     }
-  }
-
+    
   /* end of the bcast */
   return OMPI_SUCCESS;
 }
