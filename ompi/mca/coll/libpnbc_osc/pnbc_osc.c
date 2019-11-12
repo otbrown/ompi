@@ -41,7 +41,8 @@ void NBC_Reset_times() {
   Iput_time=Iget_time=Isend_time=Irecv_time=Wait_time=Test_time=0;
 }
 void NBC_Print_times(double div) {
-  printf("*** NBC_TIMES: Isend: %lf, Irecv: %lf, Wait: %lf, Test: %lf\n", Isend_time*1e6/div, Irecv_time*1e6/div, Wait_time*1e6/div, Test_time*1e6/div);
+  printf("*** NBC_TIMES: Isend: %lf, Irecv: %lf, Wait: %lf, Test: %lf\n",
+         Isend_time*1e6/div, Irecv_time*1e6/div, Wait_time*1e6/div, Test_time*1e6/div);
 }
 #endif
 
@@ -635,11 +636,11 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         }
         
         handle->req_array = tmp;
-
+        
         res = handle->win->w_osc_module->osc_get(buf1, getargs.origin_count, getargs.origin_datatype,
-                                         getargs.target, 0, getargs.target_count,
-                                         getargs.target_datatype, handle->win);
-
+                                                 getargs.target, 0, getargs.target_count,
+                                                 getargs.target_datatype, handle->win);
+        
         if (OMPI_SUCCESS != res) {
           NBC_Error ("Error in MPI_Iget(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)", (unsigned long)buf1, 
                      getargs.origin_count, getargs.origin_datatype, getargs.target, 
@@ -654,7 +655,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
      case TRY_GET:
         NBC_DEBUG(5,"  TRY_GET (offset %li) ", offset);
         NBC_GET_BYTES(ptr,trygetargs);
-        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, trygetargs.target_count, trygetargs.target_datatype, handle->tag);
+        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, trygetargs.target_count,
+                  trygetargs.target_datatype, handle->tag);
 
         /* get an additional request */
         handle->req_count++;
