@@ -379,23 +379,19 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
         VRANK2RANK(peer, vrank - (1 << r), root);
         /* try_get and place in recvbuf*/
         res = NBC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype, schedule, lock_type,
-                                 assert, false);
-        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-          return res;
-        }
-        res = NBC_Sched_barrier (schedule);
+                                 assert, true);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
       }
     }
     
-  
   }
+  
   /* root copies buffer to recvbuf */
   if (0 == vrank){
     res = NBC_Sched_copy(sendbuf, false, count, datatype, recvbuf, false, count, datatype,
-                         schedule, true);
+                         schedule, false);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       return res;
     }
