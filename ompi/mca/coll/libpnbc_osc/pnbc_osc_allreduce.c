@@ -355,7 +355,10 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
           if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
             return res;
           }
-
+          res = NBC_Sched_barrier (schedule);
+          if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+            return res;
+          }
           /* add value to my values in my window - i.e. add the values and store them in sendbuf so they can
             be use in the next r iteration */
           res = NBC_Sched_op (recvbuf, false, sendbuf, false, count, datatype, op, schedule, true); 
@@ -380,14 +383,14 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
-        
+        res = NBC_Sched_barrier (schedule);
+        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+          return res;
+        }
       }
     }
     
-    res = NBC_Sched_barrier (schedule);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-      return res;
-    }
+  
   }
   /* root copies buffer to recvbuf */
   if (0 == vrank){
