@@ -360,11 +360,13 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
           /* add value to my values in my window - i.e. add the values and store them in sendbuf so they can
             be use in the next r iteration */
           res = NBC_Sched_op (recvbuf, false, sendbuf, false, count, datatype, op, schedule, true); 
-          
+          if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+            return res;
+          }
         } 
     }
   }
-
+  
   /* this is the Bcast part */
   RANK2VRANK(rank, vrank, root);
 
@@ -388,7 +390,7 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
       return res;
     }
   }
-  
+  /* root copies buffer to recvbuf */
   if (0 == vrank){
     res = NBC_Sched_copy(sendbuf, false, count, datatype, recvbuf, false, count, datatype,
                          schedule, true);
@@ -396,7 +398,7 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
       return res;
     }
     
-  /* end of the bcast */
+    /* end of the bcast */
     return OMPI_SUCCESS;
 }
 
