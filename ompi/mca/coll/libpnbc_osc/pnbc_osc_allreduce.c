@@ -352,7 +352,6 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
           /* get the data from my peer and store it in recvbuf*/
           res = NBC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype, schedule, lock_type,
                                    assert, true);
-          //res = NBC_Sched_recv (rbuf, tmprbuf, count, datatype, peer, schedule, true);
           if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
             return res;
           }
