@@ -95,17 +95,17 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
 
-  /* icreate a dynamic window and attach to sendbuf */
+  /* create nonblocking dynamic window and attach to sendbuf */
   /* NBC_Icreate_dynamic() */
 
-  /* add complete wait request */
+  /* add complete wait request ? */
   /* if (NULL != req) { */
   /*   rc = ompi_request_wait( &req, MPI_STATUS_IGNORE); */
   /* } */
   
 
   /* algorithm selection */
-  /* NOTE: binomial alg for now only implemented */
+  /* NOTE: implemented binomial alg for now only */
   int nprocs_pof2 = opal_next_poweroftwo(p) >> 1;
   if (libnbc_iallreduce_algorithm == 0) {
     if(p < 4 || size*count < 65536 || !ompi_op_is_commute(op) || inplace) {
@@ -161,7 +161,9 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     free(tmpbuf);
     return res;
   }
-
+  
+ /* NBC add "completion point" */
+  
   res = NBC_Sched_commit(schedule);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
