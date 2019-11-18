@@ -953,29 +953,29 @@ static int ompi_osc_rdma_share_data (ompi_osc_rdma_module_t *module)
     int my_rank = ompi_comm_rank (module->comm);
     int comm_size = ompi_comm_size (module->comm);
     ompi_osc_rdma_rank_data_t *temp;
-
+    
     do {
         temp = malloc (sizeof (*temp) * comm_size);
         if (NULL == temp) {
             ret = OMPI_ERR_OUT_OF_RESOURCE;
             break;
         }
-
+        
         /* fill in rank -> node translation */
         temp[my_rank].node_id = module->node_id;
         temp[my_rank].rank = ompi_comm_rank (module->shared_comm);
-
+        
         ret = module->comm->c_coll->coll_allgather (MPI_IN_PLACE, 1, MPI_2INT, temp, 1, MPI_2INT,
-                                                   module->comm, module->comm->c_coll->coll_allgather_module);
+                                                    module->comm, module->comm->c_coll->coll_allgather_module);
         if (OMPI_SUCCESS != ret) {
             break;
         }
-
+        
         if (0 == ompi_comm_rank (module->shared_comm)) {
             /* fill in my part of the node array */
-            my_data = (ompi_osc_rdma_region_t *) ((intptr_t) module->node_comm_info + ompi_comm_rank (module->local_leaders) *
+            my_data = (ompi_osc_rdma_region_t *) ((intptr_t)module->node_comm_info + ompi_comm_rank(module->local_leaders) *
                                                   module->region_size);
-
+            
             my_data->base = (uint64_t) (intptr_t) module->rank_array;
             /* store my rank in the length field */
             my_data->len = (osc_rdma_size_t) my_rank;
@@ -986,16 +986,18 @@ static int ompi_osc_rdma_share_data (ompi_osc_rdma_module_t *module)
 
             /* gather state data at each node leader */
             if (ompi_comm_size (module->local_leaders) > 1) {
-                ret = module->local_leaders->c_coll->coll_allgather (MPI_IN_PLACE, module->region_size, MPI_BYTE, module->node_comm_info,
-                                                                    module->region_size, MPI_BYTE, module->local_leaders,
-                                                                    module->local_leaders->c_coll->coll_allgather_module);
+                ret = module->local_leaders->c_coll->coll_allgather (MPI_IN_PLACE, module->region_size, MPI_BYTE,
+                                                                     module->node_comm_info,
+                                                                     module->region_size, MPI_BYTE, module->local_leaders,
+                                                                     module->local_leaders->c_coll->coll_allgather_module);
                 if (OMPI_SUCCESS != ret) {
                     OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "leader allgather failed with ompi error code %d", ret);
                     break;
                 }
             }
 
-            int base_rank = ompi_comm_rank (module->local_leaders) * ((comm_size + module->node_count - 1) / module->node_count);
+            int base_rank = ompi_comm_rank (module->local_leaders) * ((comm_size + module->node_count - 1) /
+                                                                      module->node_count);
 
             /* fill in the local part of the rank -> node map */
             for (int i = 0 ; i < RANK_ARRAY_COUNT(module) ; ++i) {
@@ -1100,8 +1102,9 @@ static int ompi_osc_rdma_check_parameters (ompi_osc_rdma_module_t *module, int d
     values[2] = size;
     values[3] = -(ssize_t) size;
 
-    ret = module->comm->c_coll->coll_allreduce (MPI_IN_PLACE, values, 4, MPI_LONG, MPI_MIN, module->comm,
-                                               module->comm->c_coll->coll_allreduce_module);
+    ret = module->comm->c_coll->coll_allreduce (MPI_IN_PLACE, values, 4, MPI_LONG, MPI_MIN,
+                                                module->comm,
+                                                module->comm->c_coll->coll_allreduce_module);
     if (OMPI_SUCCESS != ret) {
         return ret;
     }
