@@ -395,7 +395,7 @@ int NBC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype dataty
 int NBC_Sched_ifree ( NBC_Schedule *schedule, bool barrier) {
   int ret;
   NBC_Args_win_ifree wifree_args;
-  wifree_arg.type = WIN_IFREE;
+  wifree_args.type = WIN_IFREE;
   /* append to the round-schedule */
   ret = nbc_schedule_round_append (schedule, &wifree_args, sizeof(wifree_args), barrier);
   if (OMPI_SUCCESS != ret) {
@@ -411,7 +411,7 @@ int NBC_Sched_ifree ( NBC_Schedule *schedule, bool barrier) {
 int NBC_Sched_complete_ifree ( NBC_Schedule *schedule, bool barrier ) {
   int ret;
   NBC_Args_win_ifree wifree_args;
-  wifree_arg.type = COMPLETE_WIN_IFREE;
+  wifree_args.type = COMPLETE_WIN_IFREE;
   /* append to the round-schedule */
   ret = nbc_schedule_round_append (schedule, &wifree_args, sizeof(wifree_args), barrier);
   if (OMPI_SUCCESS != ret) {
