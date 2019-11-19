@@ -88,7 +88,8 @@ typedef enum {
   PUT,
   GET,
   TRY_GET,
-  WIN_IFREE
+  WIN_IFREE,
+  COMPLETE_WIN_IFREE
 } NBC_Fn_type;
 
 /* the put argument struct */
