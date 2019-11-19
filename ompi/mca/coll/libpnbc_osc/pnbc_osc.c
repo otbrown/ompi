@@ -38,7 +38,7 @@ static inline int NBC_Start_round(NBC_Handle *handle);
 #ifdef NBC_TIMING
 static double Iput_time=0,Iget_time=0,Isend_time=0, Irecv_time=0, Wait_time=0, Test_time=0;
 void NBC_Reset_times() {
-  Iput_time=Iget_time=Isend_time=Irecv_time=Wait_time=Test_time=0;
+  Iwfree_time=Iput_time=Iget_time=Isend_time=Irecv_time=Wait_time=Test_time=0;
 }
 void NBC_Print_times(double div) {
   printf("*** NBC_TIMES: Isend: %lf, Irecv: %lf, Wait: %lf, Test: %lf\n", Isend_time*1e6/div, Irecv_time*1e6/div, Wait_time*1e6/div, Test_time*1e6/div);
@@ -586,14 +586,31 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
     switch(type) {
       case WIN_IFREE:
         NBC_DEBUG(5,"  WIN_IFREE (offset %li) ", offset);
+
         /* get an additional request */
         handle->req_count++;
         
+        tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
+        if (NULL == tmp) {
+          return OMPI_ERR_OUT_OF_RESOURCE;
+        }
+
+        handle->req_array = tmp;
+
 #ifdef NBC_TIMING
-        Iput_time -= MPI_Wtime();
+        Iwfree_time -= MPI_Wtime();
 #endif
-        res = handle->win->w_osc_module->osc_ifree(handle->win, handle->req_array +
-                                                   handle->req_count - 1);
+        res = handle->win->w_osc_module->osc_ifree(handle->win, handle->req_array+handle->req_count-1);
+        if (OMPI_SUCCESS != res) {
+          NBC_Error ("Error in Win_ifree");
+            return res;
+        }
+        /* TODO: We need to make sure that ifree has finished */
+        res = handle->win->w_osc_module->osc_complete_ifree(handle->win);
+        if (OMPI_SUCCESS != res) {
+          NBC_Error ("Error in Win_complete_ifree");
+            return res;
+        }
         break;
       case PUT:
         NBC_DEBUG(5,"  PUT (offset %li) ", offset);
@@ -789,7 +806,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
 
         handle->req_array = tmp;
 
-        res = MCA_PML_CALL(irecv(buf1, recvargs.count, recvargs.datatype, recvargs.source, handle->tag, recvargs.local?handle->comm->c_local_comm:handle->comm,
+        res = MCA_PML_CALL(irecv(buf1, recvargs.count, recvargs.datatype, recvargs.source, handle->tag,
+                                 recvargs.local?handle->comm->c_local_comm:handle->comm,
                                  handle->req_array+handle->req_count-1));
         if (OMPI_SUCCESS != res) {
           NBC_Error("Error in MPI_Irecv(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, recvargs.count,
