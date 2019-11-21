@@ -1135,16 +1135,3 @@ int NBC_Schedule_request_win(NBC_Schedule *schedule, ompi_communicator_t *comm,
 
   return OMPI_SUCCESS;
 }
-
-#ifdef NBC_CACHE_SCHEDULE
-void NBC_SchedCache_args_delete_key_dummy(void *k) {
-  /* do nothing because the key and the data element are identical :-)
-   * both (the single one :) is freed in NBC_<COLLOP>_args_delete() */
-}
-
-void NBC_SchedCache_args_delete(void *entry) {
-  struct NBC_dummyarg *tmp = (struct NBC_dummyarg*)entry;
-  OBJ_RELEASE(tmp->schedule);
-  free(entry);
-}
-#endif
