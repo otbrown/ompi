@@ -95,13 +95,14 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
 
-  /* create nonblocking dynamic window and attach to sendbuf */
-  /* NBC_Icreate_dynamic() */
+  /* 1- create nonblocking dynamic window */ 
+  /* NBC_icreate_dynamic() */
 
-  /* add complete wait request ? */
-  /* if (NULL != req) { */
-  /*   rc = ompi_request_wait( &req, MPI_STATUS_IGNORE); */
-  /* } */
+  /* 2- ensures the windows has been created */
+  /* NBC_complete_icreate_dynamic()
+
+  /* 3- Attach window to sendbuf */
+  /* NBC_attach_win(); */
   
 
   /* algorithm selection */
@@ -134,7 +135,8 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
 
-  /* NBC add "restart point" */
+  /* 4- NBC add "restart point" */
+  /* TODO: it is not clear how to do it */
   
   if (p == 1) {
     res = NBC_Sched_copy((void *)sendbuf, false, count, datatype,
@@ -162,7 +164,14 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     return res;
   }
   
- /* NBC add "completion point" */
+ /* 5- NBC add "completion point" */
+ /* TODO: it is not clear how to do it */
+
+  /* 6- NBC nonblocking free window */
+  /* NBC_Sched_ifree() */
+
+  /* 7- NBC complete nonblocking free window */
+  /* NBC_Sched_complete_ifree() */
   
   res = NBC_Sched_commit(schedule);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
