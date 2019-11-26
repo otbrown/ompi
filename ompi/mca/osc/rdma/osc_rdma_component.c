@@ -1033,7 +1033,7 @@ static int ompi_osc_rdma_share_data (ompi_osc_rdma_module_t *module)
     return global_result;
 }
 
-static int ompi_osc_rdma_create_groups (ompi_osc_rdma_module_t *module, ompi_request_t ** request, bool nonblocking)
+static int ompi_osc_rdma_create_groups (ompi_osc_rdma_module_t *module)
 {
     int comm_rank, ret, local_rank;
     int values[2] = {0, 0};
@@ -1062,19 +1062,59 @@ static int ompi_osc_rdma_create_groups (ompi_osc_rdma_module_t *module, ompi_req
     }
 
     if (ompi_comm_size (module->shared_comm) > 1) {
-        if( false == nonblocking ){
-            ret = module->shared_comm->c_coll->coll_bcast (values, 2, MPI_INT, 0, module->shared_comm,
-                                                           module->shared_comm->c_coll->coll_bcast_module);
-            if (OMPI_SUCCESS != ret) {                OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "failed to broadcast local data. error code %d", ret);
-                return ret;
-            }
-        }else{
-            ret = module->shared_comm->c_coll->coll_ibcast (values, 2, MPI_INT, 0, module->shared_comm, request,
+        
+        ret = module->shared_comm->c_coll->coll_bcast (values, 2, MPI_INT, 0, module->shared_comm,
+                                                       module->shared_comm->c_coll->coll_bcast_module);
+        if (OMPI_SUCCESS != ret) {
+            OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR,
+                             "failed to broadcast local data. error code %d", ret);
+            return ret;
+        }
+        
+    }
+    
+        
+    module->node_count = values[0];
+    module->node_id = values[1];
+    
+    return OMPI_SUCCESS;
+}
+
+static int ompi_osc_rdma_icreate_groups (ompi_osc_rdma_module_t *module, ompi_request_t ** request)
+{
+    int comm_rank, ret, local_rank;
+    int values[2] = {0, 0};
+
+    /* create a shared communicator to handle communication about the local segment */
+    ret = ompi_comm_split_type (module->comm, MPI_COMM_TYPE_SHARED, 0, NULL, &module->shared_comm);
+    if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "failed to create a shared memory communicator. error code %d", ret);
+        return ret;
+    }
+
+    local_rank = ompi_comm_rank (module->shared_comm);
+
+    comm_rank = ompi_comm_rank (module->comm);
+
+    ret = ompi_comm_split (module->comm, (0 == local_rank) ? 0 : MPI_UNDEFINED, comm_rank, &module->local_leaders,
+                           false);
+    if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
+        OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "failed to create local leaders communicator. error code %d", ret);
+        return ret;
+    }
+
+    if (0 == local_rank) {
+        values[0] = ompi_comm_size (module->local_leaders);
+        values[1] = ompi_comm_rank (module->local_leaders);
+    }
+
+    if (ompi_comm_size (module->shared_comm) > 1) {
+        ret = module->shared_comm->c_coll->coll_ibcast (values, 2, MPI_INT, 0, module->shared_comm, request,
                                                             module->shared_comm->c_coll->coll_ibcast_module);
-            if (OMPI_SUCCESS != ret) {
-                OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "failed to ibroadcast local data. error code %d", ret);
-                return ret;
-            }
+        if (OMPI_SUCCESS != ret) {
+            OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "failed to ibroadcast local data. error code %d", ret);
+            return ret;
+            
         }
      
     }
@@ -1095,8 +1135,7 @@ static int ompi_osc_rdma_create_groups (ompi_osc_rdma_module_t *module, ompi_req
  * This function checks if all ranks have the same displacement unit or size and sets the appropriate
  * flags on the module.
  */
-static int ompi_osc_rdma_check_parameters (ompi_osc_rdma_module_t *module, ompi_request_t **request, int disp_unit,
-                                           size_t size, bool nonblocking)
+static int ompi_osc_rdma_check_parameters (ompi_osc_rdma_module_t *module, int disp_unit, size_t size)
 {
     long values[4];
     int ret;
@@ -1111,19 +1150,13 @@ static int ompi_osc_rdma_check_parameters (ompi_osc_rdma_module_t *module, ompi_
     values[1] = -disp_unit;
     values[2] = size;
     values[3] = -(ssize_t) size;
-    if (false == nonblocking ){
-        ret = module->comm->c_coll->coll_allreduce (MPI_IN_PLACE, values, 4, MPI_LONG, MPI_MIN,
-                                                    module->comm,
-                                                    module->comm->c_coll->coll_allreduce_module);
-    }else{
-        ret = module->comm->c_coll->coll_iallreduce (MPI_IN_PLACE, values, 4, MPI_LONG, MPI_MIN,
-                                                     module->comm, request, 
-                                                     module->comm->c_coll->coll_iallreduce_module);
-    }
+    ret = module->comm->c_coll->coll_allreduce (MPI_IN_PLACE, values, 4, MPI_LONG, MPI_MIN,
+                                                module->comm,
+                                                module->comm->c_coll->coll_allreduce_module);
     if (OMPI_SUCCESS != ret) {
         return ret;
     }
-
+    
     if (values[0] == -values[1]) {
         /* same displacement */
         module->same_disp_unit = true;
@@ -1136,6 +1169,44 @@ static int ompi_osc_rdma_check_parameters (ompi_osc_rdma_module_t *module, ompi_
 
     return OMPI_SUCCESS;
 }
+
+static int ompi_osc_rdma_icheck_parameters (ompi_osc_rdma_module_t *module, ompi_request_t **request, int disp_unit,
+                                            size_t size)
+{
+    long values[4];
+    int ret;
+
+    if (MPI_WIN_FLAVOR_DYNAMIC == module->flavor || (module->same_size && module->same_disp_unit)) {
+        /* done */
+        return OMPI_SUCCESS;
+    }
+
+    /* check displacements and sizes */
+    values[0] = disp_unit;
+    values[1] = -disp_unit;
+    values[2] = size;
+    values[3] = -(ssize_t) size;
+    
+    ret = module->comm->c_coll->coll_iallreduce (MPI_IN_PLACE, values, 4, MPI_LONG, MPI_MIN,
+                                                 module->comm, request, 
+                                                 module->comm->c_coll->coll_iallreduce_module);
+    if (OMPI_SUCCESS != ret) {
+        return ret;
+    }
+    
+    if (values[0] == -values[1]) {
+        /* same displacement */
+        module->same_disp_unit = true;
+    }
+
+    if (values[2] == -values[3]) {
+        /* same size */
+        module->same_size = true;
+    }
+
+    return OMPI_SUCCESS;
+}
+
 
 
 static int ompi_osc_rdma_component_select (struct ompi_win_t *win, void **base, size_t size, int disp_unit,
@@ -1256,13 +1327,13 @@ static int ompi_osc_rdma_component_select (struct ompi_win_t *win, void **base, 
     /* fill in the function pointer part */
     memcpy(&module->super, &ompi_osc_rdma_module_rdma_template, sizeof(module->super));
 
-    ret = ompi_osc_rdma_check_parameters (module, NULL, disp_unit, size, false);
+    ret = ompi_osc_rdma_check_parameters (module, disp_unit, size);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
         ompi_osc_rdma_free (win);
         return ret;
     }
 
-    ret = ompi_osc_rdma_create_groups (module, NULL, false);
+    ret = ompi_osc_rdma_create_groups (module);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
         ompi_osc_rdma_free (win);
         return ret;
@@ -1487,13 +1558,13 @@ static int ompi_osc_rdma_component_complete_iselect(struct ompi_win_t *win, void
     /* fill in the function pointer part */
     memcpy(&module->super, &ompi_osc_rdma_module_rdma_template, sizeof(module->super));
 
-    ret = ompi_osc_rdma_check_parameters (module, request, disp_unit, size, true);
+    ret = ompi_osc_rdma_icheck_parameters (module, request, disp_unit, size);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
         ompi_osc_rdma_free (win);
         return ret;
     }
 
-    ret = ompi_osc_rdma_create_groups (module, request, true);
+    ret = ompi_osc_rdma_icreate_groups (module, request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
         ompi_osc_rdma_free (win);
         return ret;
