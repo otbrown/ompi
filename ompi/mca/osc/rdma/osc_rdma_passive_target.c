@@ -162,7 +162,9 @@ static inline int ompi_osc_rdma_lock_atomic_internal (ompi_osc_rdma_module_t *mo
 }
 
 /* locking via atomics */
-static inline int ompi_osc_rdma_try_lock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer, ompi_osc_rdma_sync_t *lock)
+static inline int ompi_osc_rdma_try_lock_atomic_internal (ompi_osc_rdma_module_t *module, 
+                                                          ompi_osc_rdma_peer_t *peer, 
+                                                          ompi_osc_rdma_sync_t *lock)
 {
     const int locking_mode = module->locking_mode;
     int ret;
@@ -172,24 +174,27 @@ static inline int ompi_osc_rdma_try_lock_atomic_internal (ompi_osc_rdma_module_t
         OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "incrementing global exclusive lock");
         if (OMPI_OSC_RDMA_LOCKING_TWO_LEVEL == locking_mode) {
             /* lock the master lock. this requires no rank has a global shared lock */
-            ret = ompi_osc_rdma_lock_acquire_shared (module, module->leader, 1, offsetof (ompi_osc_rdma_state_t, global_lock),
+            ret = ompi_osc_rdma_lock_acquire_shared (module, module->leader, 1, 
+                                                     offsetof (ompi_osc_rdma_state_t, global_lock),
                                                      0xffffffff00000000L);
             if (OMPI_SUCCESS != ret) {
                 ompi_osc_rdma_progress (module);
-                return ret;
+                return OMPI_ERR_RMA_NB_PENDING;
             }
         }
         
         OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "acquiring exclusive lock on peer");
-        ret = ompi_osc_rdma_lock_try_acquire_exclusive (module, peer,  offsetof (ompi_osc_rdma_state_t, local_lock));
-        /* failure */
+        ret = ompi_osc_rdma_lock_try_acquire_exclusive (module, peer,  offsetof (ompi_osc_rdma_state_t, 
+                                                                                 local_lock));
+        /* if failure */
         if (OMPI_SUCCESS != ret) {
             /* release the global lock */
             if (OMPI_OSC_RDMA_LOCKING_TWO_LEVEL == locking_mode) {
-                ompi_osc_rdma_lock_release_shared (module, module->leader, -1, offsetof (ompi_osc_rdma_state_t, global_lock));
+                ompi_osc_rdma_lock_release_shared (module, module->leader, -1, offsetof (ompi_osc_rdma_state_t,
+                                                                                         global_lock));
             }
             ompi_osc_rdma_progress (module);
-            return ret;
+            return OMPI_ERR_RMA_NB_PENDING;
         }
         
         peer->flags |= OMPI_OSC_RDMA_PEER_EXCLUSIVE;
@@ -207,12 +212,13 @@ static inline int ompi_osc_rdma_try_lock_atomic_internal (ompi_osc_rdma_module_t
         }
         
         ompi_osc_rdma_progress (module);
-        return ret;
+        return OMPI_ERR_RMA_NB_PENDING;
     }
 
 }
 
-static inline int ompi_osc_rdma_unlock_atomic_internal (ompi_osc_rdma_module_t *module, ompi_osc_rdma_peer_t *peer,
+static inline int ompi_osc_rdma_unlock_atomic_internal (ompi_osc_rdma_module_t *module, 
+                                                        ompi_osc_rdma_peer_t *peer,
                                                         ompi_osc_rdma_sync_t *lock)
 {
     const int locking_mode = module->locking_mode;
@@ -223,7 +229,8 @@ static inline int ompi_osc_rdma_unlock_atomic_internal (ompi_osc_rdma_module_t *
 
         if (OMPI_OSC_RDMA_LOCKING_TWO_LEVEL == locking_mode) {
             OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_DEBUG, "decrementing global exclusive lock");
-            ompi_osc_rdma_lock_release_shared (module, module->leader, -1, offsetof (ompi_osc_rdma_state_t, global_lock));
+            ompi_osc_rdma_lock_release_shared (module, module->leader, -1, offsetof (ompi_osc_rdma_state_t,
+                                                                                     global_lock));
         }
 
         peer->flags &= ~OMPI_OSC_RDMA_PEER_EXCLUSIVE;
@@ -394,6 +401,7 @@ int ompi_osc_rdma_try_lock_atomic (int lock_type, int target, int assert, ompi_w
         
         /* delete the lock */
         ompi_osc_rdma_sync_return (lock);
+
     }
 
     OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_TRACE, "lock %d complete", target);

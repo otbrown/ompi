@@ -587,7 +587,6 @@ static inline void ompi_osc_rdma_sync_rdma_complete (ompi_osc_rdma_sync_t *sync)
  *
  * @param[in] module          osc rdma module
  * 
- * @returns true if complete is successful
  * @returns OMPI_ERR_RMA_NB_PENDING Complete is still pending, try again later
  * @returns OMPI_SUCCESS Complete has executed correctly
  */
