@@ -973,22 +973,24 @@ static int ompi_osc_rdma_share_data (ompi_osc_rdma_module_t *module)
         
         if (0 == ompi_comm_rank (module->shared_comm)) {
             /* fill in my part of the node array */
-            my_data = (ompi_osc_rdma_region_t *) ((intptr_t)module->node_comm_info + ompi_comm_rank(module->local_leaders) *
-                                                  module->region_size);
+            my_data = (ompi_osc_rdma_region_t *) ((intptr_t)module->node_comm_info +
+                                                  ompi_comm_rank(module->local_leaders) * module->region_size);
             
             my_data->base = (uint64_t) (intptr_t) module->rank_array;
             /* store my rank in the length field */
             my_data->len = (osc_rdma_size_t) my_rank;
-
+            
             if (module->selected_btl->btl_register_mem) {
-                memcpy (my_data->btl_handle_data, module->state_handle, module->selected_btl->btl_registration_handle_size);
+                memcpy (my_data->btl_handle_data, module->state_handle,
+                        module->selected_btl->btl_registration_handle_size);
             }
 
             /* gather state data at each node leader */
             if (ompi_comm_size (module->local_leaders) > 1) {
                 ret = module->local_leaders->c_coll->coll_allgather (MPI_IN_PLACE, module->region_size, MPI_BYTE,
                                                                      module->node_comm_info,
-                                                                     module->region_size, MPI_BYTE, module->local_leaders,
+                                                                     module->region_size, MPI_BYTE,
+                                                                     module->local_leaders,
                                                                      module->local_leaders->c_coll->coll_allgather_module);
                 if (OMPI_SUCCESS != ret) {
                     OSC_RDMA_VERBOSE(MCA_BASE_VERBOSE_ERROR, "leader allgather failed with ompi error code %d", ret);
