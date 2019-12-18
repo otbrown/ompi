@@ -194,8 +194,10 @@ int ompi_coll_libnbc_allreduce(const void* sendbuf, void* recvbuf, int count, MP
     return res;
   }
 
-  //TODO: I need to make sure win_icreate_dynamic has finished before continuing
-  
+  // TODO: I need to make sure win_icreate_dynamic has finished before continuing
+
+  /*  complete call to icreate dynamic  */
+  /* res = NBC_Sched_complete_icreate_dynamic();*/
   
   res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op, newcomm, request, module, win, false);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
