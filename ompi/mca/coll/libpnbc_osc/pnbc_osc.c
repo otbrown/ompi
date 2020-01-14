@@ -78,7 +78,8 @@ static int nbc_schedule_grow (NBC_Schedule *schedule, int additional) {
   return OMPI_SUCCESS;
 }
 
-static int nbc_schedule_round_append (NBC_Schedule *schedule, void *data, int data_size, bool barrier) {
+static int nbc_schedule_round_append (NBC_Schedule *schedule, void *data, int data_size,
+                                      bool barrier) {
   int ret, size = nbc_schedule_get_size (schedule);
 
   if (barrier) {
@@ -230,12 +231,14 @@ static int NBC_Sched_try_get_internal (const void* buf, char tmpbuf, int origin_
 int NBC_Sched_try_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
                        int target, int target_count,  MPI_Datatype target_datatype, 
                        NBC_Schedule *schedule, int lock_type, int assert, bool barrier) {
-  return NBC_Sched_try_get_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
-                                     target_datatype, false, schedule, lock_type, assert, barrier);
+  return NBC_Sched_try_get_internal (buf, tmpbuf, origin_count, origin_datatype, target,
+                                     target_count, target_datatype, false, schedule,
+                                     lock_type, assert, barrier);
 }
 
 /* this function puts a send into the schedule */
-static int NBC_Sched_send_internal (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, bool local, NBC_Schedule *schedule, bool barrier) {
+static int NBC_Sched_send_internal (const void* buf, char tmpbuf, int count, MPI_Datatype datatype,
+                                    int dest, bool local, NBC_Schedule *schedule, bool barrier) {
   NBC_Args_send send_args;
   int ret;
 
@@ -253,29 +256,33 @@ static int NBC_Sched_send_internal (const void* buf, char tmpbuf, int count, MPI
   if (OMPI_SUCCESS != ret) {
     return ret;
   }
-
+  
   NBC_DEBUG(10, "added send - ends at byte %i\n", nbc_schedule_get_size (schedule));
 
   return OMPI_SUCCESS;
 }
 
-int NBC_Sched_local_put (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                         int target, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_local_put (const void* buf, char tmpbuf, int origin_count,
+                         MPI_Datatype origin_datatype, int target, NBC_Schedule *schedule,
+                         bool barrier) {
   return NBC_Sched_send_internal (buf, tmpbuf, origin_count, origin_datatype, target, true,
                                   schedule, barrier);
 }
 
 
-int NBC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,
+                    NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, false, schedule, barrier);
 }
 
-int NBC_Sched_local_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_local_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,
+                          NBC_Schedule *schedule, bool barrier) {
   return NBC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, true, schedule, barrier);
 }
 
 /* this function puts a receive into the schedule */
-static int NBC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, bool local, NBC_Schedule *schedule, bool barrier) {
+static int NBC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datatype datatype,
+                                    int source, bool local, NBC_Schedule *schedule, bool barrier) {
   NBC_Args_recv recv_args;
   int ret;
 
@@ -299,8 +306,9 @@ static int NBC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datat
   return OMPI_SUCCESS;
 }
 
-int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                         int target, NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count,
+                         MPI_Datatype origin_datatype, int target, NBC_Schedule *schedule,
+                         bool barrier) {
   return NBC_Sched_recv_internal(buf, tmpbuf, origin_count, origin_datatype, target, true,
                                  schedule, barrier);
 }
@@ -470,7 +478,8 @@ int NBC_Progress(NBC_Handle *handle) {
         ompi_request_t *subreq = handle->req_array[handle->req_count - 1];
         if (REQUEST_COMPLETE(subreq)) {
             if(OPAL_UNLIKELY( OMPI_SUCCESS != subreq->req_status.MPI_ERROR )) {
-                NBC_Error ("MPI Error in NBC subrequest %p : %d", subreq, subreq->req_status.MPI_ERROR);
+                NBC_Error ("MPI Error in NBC subrequest %p : %d", subreq,
+                           subreq->req_status.MPI_ERROR);
                 /* copy the error code from the underlying request and let the
                  * round finish */
                 handle->super.req_status.MPI_ERROR = subreq->req_status.MPI_ERROR;
@@ -592,7 +601,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
 #ifdef NBC_TIMING
         Iput_time -= MPI_Wtime();
 #endif
-        tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
+        tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count *
+                                       sizeof (MPI_Request));
         if (NULL == tmp) {
           return OMPI_ERR_OUT_OF_RESOURCE;
         }
@@ -630,7 +640,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
         Iget_time -= MPI_Wtime();
 #endif
         //TODO: I am not too sure we need to realloc for PUT/GET - Not used
-        tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
+        tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count *
+                                       sizeof (MPI_Request));
         if (NULL == tmp) {
           return OMPI_ERR_OUT_OF_RESOURCE;
         }
@@ -655,7 +666,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
      case TRY_GET:
         NBC_DEBUG(5,"  TRY_GET (offset %li) ", offset);
         NBC_GET_BYTES(ptr,trygetargs);
-        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target, trygetargs.target_count,
+        NBC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n", trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype,
+                  trygetargs.target, trygetargs.target_count,
                   trygetargs.target_datatype, handle->tag);
 
         /* get an additional request */
