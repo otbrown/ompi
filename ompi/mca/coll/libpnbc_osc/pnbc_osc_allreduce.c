@@ -58,7 +58,8 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   void *tmpbuf = NULL;
   ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
   ptrdiff_t span, gap;
-  
+  MPI_Aint disp, *disp_a;
+
   NBC_IN_PLACE(sendbuf, recvbuf, inplace);
 
   rank = ompi_comm_rank (comm);
@@ -95,18 +96,36 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
 
-  /* 1- create nonblocking dynamic window */ 
-  /* NBC_icreate_dynamic() */
-
-  /* 2- ensures the windows has been created */
+  /* create MPI dynamic window */ 
+  res = ompi_win_create_dynamic(MPI_INFO_NULL, comm, &win);
+  if (OMPI_SUCCESS != res) {
+    NBC_Error ("MPI Error in win_create_dynamic (%i)", res);
+    return res;
+  }
+  
+  /* TODO: ensures the windows has been created */
   /* NBC_complete_icreate_dynamic()
 
-  /* 3- Attach window to sendbuf */
-  /* NBC_attach_win(); */
-  
 
-  /* algorithm selection */
-  /* NOTE: implemented binomial alg for now only */
+  /* Attach window to sendbuf */
+  res = win->w_osc_module->osc_win_attach(win, sendbuf, count*size);
+  
+  /* MPI Get_address  */
+  MPI_Get_address (sendbuf, &disp);
+
+  /* create an array of displacements */
+  disp_a = (MPI_Aint*)malloc(count * sizeof(MPI_Aint));
+
+  /* Gather ALL displacements-> pt2pt call */
+  
+  res = comm->c_coll->coll_allgather(&disp, 1, MPI_Aint, disp_a, count, MPI_Aint, comm,
+                                     comm->c_coll->coll_allgather_module);
+  if (OMPI_SUCCESS != res) {
+    NBC_Error ("MPI Error in coll_allgather (%i)", res);
+    return res;
+  }
+  
+  /* algorithm selection - NOTE: implemented binomial alg for now only */
   int nprocs_pof2 = opal_next_poweroftwo(p) >> 1;
   if (libnbc_iallreduce_algorithm == 0) {
     if(p < 4 || size*count < 65536 || !ompi_op_is_commute(op) || inplace) {
@@ -136,7 +155,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   }
 
   /* 4- NBC add "restart point" */
-  /* TODO: it is not clear how to do it */
+  /* TODO: it is not clear how to do this */
   
   if (p == 1) {
     res = NBC_Sched_copy((void *)sendbuf, false, count, datatype,
@@ -165,7 +184,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   }
   
  /* 5- NBC add "completion point" */
- /* TODO: it is not clear how to do it */
+ /* TODO: it is not clear how to do this */
 
   /* 6- NBC nonblocking free window */
   /* NBC_Sched_ifree() */
@@ -359,8 +378,8 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
       VRANK2RANK(peer, vpeer, root)
         if (peer < p) {
           /* get the data from my peer and store it in recvbuf*/
-          res = NBC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype, schedule, lock_type,
-                                   assert, true);
+          res = NBC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype,
+                                   schedule, lock_type, assert, true);
           if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
             return res;
           }
@@ -368,8 +387,8 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
           if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
             return res;
           }
-          /* add value to my values in my window - i.e. add the values and store them in sendbuf so they can
-            be use in the next r iteration */
+          /* add value to my values in my window - i.e. add the values and store them in sendbuf 
+             so they can be use in the next r iteration */
           res = NBC_Sched_op (recvbuf, false, sendbuf, false, count, datatype, op, schedule, true); 
           if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
             return res;
@@ -387,8 +406,8 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
       if ((vrank >= (1 << r)) && (vrank < (1 << (r + 1)))) {
         VRANK2RANK(peer, vrank - (1 << r), root);
         /* try_get and place in recvbuf*/
-        res = NBC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype, schedule, lock_type,
-                                 assert, true);
+        res = NBC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype,
+                                 schedule, lock_type, assert, true);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
