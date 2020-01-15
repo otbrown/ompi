@@ -88,8 +88,7 @@ typedef enum {
   PUT,
   GET,
   TRY_GET,
-  WIN_IFREE,
-  COMPLETE_WIN_IFREE
+  WIN_FREE,
 } NBC_Fn_type;
 
 /* the put argument struct */
@@ -105,10 +104,10 @@ typedef struct {
   bool local;
 } NBC_Args_put;
 
-/* the win_ifree argument struct */
+/* the win_free argument struct */
 typedef struct {
   NBC_Fn_type type;
-} NBC_Args_win_ifree;
+} NBC_Args_win_free;
   
 /* the get argument struct */
 typedef struct {
@@ -391,9 +390,9 @@ static inline void nbc_get_round_size (char *p, unsigned long *size) {
   for (int i = 0 ; i < num ; ++i) {
     memcpy (&type, p + offset, sizeof (type));
     switch(type) {
-    case WIN_IFREE:
+    case WIN_FREE:
        /*printf("found a iFREE at offset %li\n", (long)p-(long)schedule); */
-      offset += sizeof(NBC_Args_win_ifree);
+      offset += sizeof(NBC_Args_win_free);
       break;
     case PUT:
        /*printf("found a PUT at offset %li\n", (long)p-(long)schedule); */

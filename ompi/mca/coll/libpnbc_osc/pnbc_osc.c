@@ -399,35 +399,18 @@ int NBC_Sched_unpack ( void *inbuf, char tmpinbuf, int count, MPI_Datatype datat
   return OMPI_SUCCESS;
 }
 /* this function adds win_ifree into the schedule */
-int NBC_Sched_win_ifree ( NBC_Schedule *schedule, bool barrier) {
+int NBC_Sched_win_free ( NBC_Schedule *schedule, bool barrier) {
   int ret;
-  NBC_Args_win_ifree wifree_args;
-  wifree_args.type = WIN_IFREE;
+  NBC_Args_win_free wfree_args;
+  wfree_args.type = WIN_FREE;
 
   /* append to the round-schedule */
-  ret = nbc_schedule_round_append (schedule, &wifree_args, sizeof(wifree_args), barrier);
+  ret = nbc_schedule_round_append (schedule, &wfree_args, sizeof(wfree_args), barrier);
   if (OMPI_SUCCESS != ret) {
     return ret;
   }
 
-  NBC_DEBUG(10, "added win_ifree - ends at byte %i\n", nbc_schedule_get_size (schedule));
-
-  return OMPI_SUCCESS;
-}
-
-/* this function adds win_ifree into the schedule */
-int NBC_Sched_complete_win_ifree ( NBC_Schedule *schedule, bool barrier ) {
-  int ret;
-  NBC_Args_win_ifree wifree_args;
-  wifree_args.type = COMPLETE_WIN_IFREE;
-
-  /* append to the round-schedule */
-  ret = nbc_schedule_round_append (schedule, &wifree_args, sizeof(wifree_args), barrier);
-  if (OMPI_SUCCESS != ret) {
-    return ret;
-  }
-  
-  NBC_DEBUG(10, "added complete_win_ifree - ends at byte %i\n", nbc_schedule_get_size (schedule));
+  NBC_DEBUG(10, "added win_free - ends at byte %i\n", nbc_schedule_get_size (schedule));
 
   return OMPI_SUCCESS;
 }
@@ -597,7 +580,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
   NBC_Args_op         opargs;
   NBC_Args_copy     copyargs;
   NBC_Args_unpack unpackargs;
-
+  NBC_Args_win_free wfreeargs;
+  
   void *buf1,  *buf2;
 
   /* get round-schedule address */
@@ -612,27 +596,8 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
     memcpy (&type, ptr, sizeof (type));
     switch(type) {
 
-    case COMPLETE_WIN_IFREE:
-      NBC_DEBUG(5,"  COMPLETE_WIN_IFREE (offset %li) ", offset);
-      
-#ifdef NBC_TIMING
-      Iwfree_time -= MPI_Wtime();
-#endif
-      
-      /* TODO: We need to make sure that ifree has finished */
-      res = handle->win->w_osc_module->osc_complete_ifree(handle->win);
-      if (OMPI_SUCCESS != res) {
-        NBC_Error ("Error in Win_complete_ifree");
-        return res;
-      }
-      
-#ifdef NBC_TIMING
-      Iwfree_time += MPI_Wtime();
-#endif
-
-      break;
-    case WIN_IFREE:
-      NBC_DEBUG(5,"  WIN_IFREE (offset %li) ", offset);
+    case WIN_FREE:
+      NBC_DEBUG(5,"  WIN_FREE (offset %li) ", offset);
 
       /* get an additional request */
       handle->req_count++;
@@ -648,9 +613,9 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
       Iwfree_time -= MPI_Wtime();
 #endif
       
-      res = handle->win->w_osc_module->osc_ifree(handle->win, handle->req_array+handle->req_count-1);
+      res = handle->win->w_osc_module->osc_free(handle->win);
       if (OMPI_SUCCESS != res) {
-        NBC_Error ("Error in Win_ifree");
+        NBC_Error ("Error in win_free");
         return res;
       }
       
