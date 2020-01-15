@@ -154,8 +154,8 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
 
-  /* 4- NBC add "restart point" */
-  /* TODO: it is not clear how to do this */
+  /* TODO: add "restart point" */
+
   
   if (p == 1) {
     res = NBC_Sched_copy((void *)sendbuf, false, count, datatype,
@@ -183,15 +183,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
     return res;
   }
   
- /* 5- NBC add "completion point" */
- /* TODO: it is not clear how to do this */
-
-  /* 6- NBC nonblocking free window */
-  /* NBC_Sched_ifree() */
-
-  /* 7- NBC complete nonblocking free window */
-  /* NBC_Sched_complete_ifree() */
-  
+  /*TODO: add win_free*/
   res = NBC_Sched_commit(schedule);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
