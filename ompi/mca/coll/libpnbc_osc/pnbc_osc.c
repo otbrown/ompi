@@ -768,21 +768,21 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
           trygetargs.lock_status = UNLOCKED;
         }
 
+      }else{
+        
+        return res;
       }
-    }else{
 
-      return res;
-    }
-
-    /* [state is locked] */
-    res = handle->win->w_osc_module->osc_try_unlock(trygetargs.target, handle->win);
-    if (OMPI_SUCCESS != res){
-      return res;
-    }
+      /* [state is locked] */
+      res = handle->win->w_osc_module->osc_try_unlock(trygetargs.target, handle->win);
+      if (OMPI_SUCCESS != res){
+        return res;
+      }
+      
 #ifdef NBC_TIMING
-    Iget_time += MPI_Wtime();
+      Iget_time += MPI_Wtime();
 #endif
-
+      
     break;
   case SEND:
     NBC_DEBUG(5,"  SEND (offset %li) ", offset);
