@@ -207,7 +207,7 @@ int NBC_Sched_local_put (const void* buf, char tmpbuf, int origin_count,
 int NBC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype, 
                    int target, int target_count,  MPI_Datatype target_datatype, 
                    NBC_Schedule *schedule, bool barrier);
-int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, 
+int NBC_Sched_local_get (void* buf, char tmpbuf, int origin_count, 
                          MPI_Datatype origin_datatype, int target, NBC_Schedule *schedule,
                          bool barrier);
  /* try_get */

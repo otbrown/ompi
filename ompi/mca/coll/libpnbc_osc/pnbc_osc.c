@@ -306,7 +306,7 @@ static int NBC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datat
   return OMPI_SUCCESS;
 }
 
-int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count,
+int NBC_Sched_local_get (void* buf, char tmpbuf, int origin_count,
                          MPI_Datatype origin_datatype, int target, NBC_Schedule *schedule,
                          bool barrier) {
   return NBC_Sched_recv_internal(buf, tmpbuf, origin_count, origin_datatype, target, true,
