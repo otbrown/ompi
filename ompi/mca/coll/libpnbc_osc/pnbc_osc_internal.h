@@ -336,12 +336,12 @@ void NBC_SchedCache_args_delete_key_dummy(void *k);
 
 int NBC_Start(NBC_Handle *handle);
 int NBC_Schedule_request(NBC_Schedule *schedule, ompi_communicator_t *comm,
-                         ompi_coll_libnbc_module_t *module, bool persistent,
+                         ompi_coll_libpnbc_osc_module_t *module, bool persistent,
                          ompi_request_t **request, void *tmpbuf);
 int NBC_Schedule_request_win(NBC_Schedule *schedule, ompi_communicator_t *comm,
-                             ompi_win_t *win, ompi_coll_libnbc_module_t *module,
+                             ompi_win_t *win, ompi_coll_libpnbc_osc_module_t *module,
                              bool persistent, ompi_request_t **request, void *tmpbuf);
-void NBC_Return_handle(ompi_coll_libnbc_request_t *request);
+void NBC_Return_handle(ompi_coll_libpnbc_osc_request_t *request);
 static inline int NBC_Type_intrinsic(MPI_Datatype type);
 int NBC_Create_fortran_handle(int *fhandle, NBC_Handle **handle);
 

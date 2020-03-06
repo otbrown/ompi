@@ -879,7 +879,7 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
   return OMPI_SUCCESS;
 }
 
-void NBC_Return_handle(ompi_coll_libnbc_request_t *request) {
+void NBC_Return_handle(ompi_coll_libpnbc_osc_request_t *request) {
   NBC_Free (request);
   OMPI_COLL_LIBNBC_REQUEST_RETURN(request);
 }
@@ -906,19 +906,19 @@ int NBC_Start(NBC_Handle *handle) {
     return res;
   }
 
-  OPAL_THREAD_LOCK(&mca_coll_libnbc_component.lock);
-  opal_list_append(&mca_coll_libnbc_component.active_requests, &(handle->super.super.super));
-  OPAL_THREAD_UNLOCK(&mca_coll_libnbc_component.lock);
+  OPAL_THREAD_LOCK(&mca_coll_libpnbc_osc_component.lock);
+  opal_list_append(&mca_coll_libpnbc_osc_component.active_requests, &(handle->super.super.super));
+  OPAL_THREAD_UNLOCK(&mca_coll_libpnbc_osc_component.lock);
 
   return OMPI_SUCCESS;
 }
 
 int NBC_Schedule_request(NBC_Schedule *schedule, ompi_communicator_t *comm,
-                         ompi_coll_libnbc_module_t *module, bool persistent,
+                         ompi_coll_libpnbc_osc_module_t *module, bool persistent,
                          ompi_request_t **request, void *tmpbuf) {
   int ret, tmp_tag;
   bool need_register = false;
-  ompi_coll_libnbc_request_t *handle;
+  ompi_coll_libpnbc_osc_request_t *handle;
 
   /* no operation (e.g. one process barrier)? */
   if (((int *)schedule->data)[0] == 0 && schedule->data[sizeof(int)] == 0) {
@@ -974,9 +974,9 @@ int NBC_Schedule_request(NBC_Schedule *schedule, ompi_communicator_t *comm,
   /* register progress */
   if (need_register) {
       int32_t tmp =
-          OPAL_THREAD_ADD_FETCH32(&mca_coll_libnbc_component.active_comms, 1);
+          OPAL_THREAD_ADD_FETCH32(&mca_coll_libpnbc_osc_component.active_comms, 1);
       if (tmp == 1) {
-          opal_progress_register(ompi_coll_libnbc_progress);
+          opal_progress_register(ompi_coll_libpnbc_osc_progress);
       }
   }
 
@@ -996,11 +996,11 @@ int NBC_Schedule_request(NBC_Schedule *schedule, ompi_communicator_t *comm,
 }
 
 int NBC_Schedule_request_win(NBC_Schedule *schedule, ompi_communicator_t *comm,
-                             ompi_win_t *win, ompi_coll_libnbc_module_t *module,
+                             ompi_win_t *win, ompi_coll_libpnbc_osc_module_t *module,
                              bool persistent, ompi_request_t **request, void *tmpbuf) {
   int ret, tmp_tag;
   bool need_register = false;
-  ompi_coll_libnbc_request_t *handle;
+  ompi_coll_libpnbc_osc_request_t *handle;
 
   /* no operation (e.g. one process barrier)? */
   if (((int *)schedule->data)[0] == 0 && schedule->data[sizeof(int)] == 0) {
@@ -1057,9 +1057,9 @@ int NBC_Schedule_request_win(NBC_Schedule *schedule, ompi_communicator_t *comm,
   /* register progress */
   if (need_register) {
       int32_t tmp =
-          OPAL_THREAD_ADD_FETCH32(&mca_coll_libnbc_component.active_comms, 1);
+          OPAL_THREAD_ADD_FETCH32(&mca_coll_libpnbc_osc_component.active_comms, 1);
       if (tmp == 1) {
-          opal_progress_register(ompi_coll_libnbc_progress);
+          opal_progress_register(ompi_coll_libpnbc_osc_progress);
       }
   }
 

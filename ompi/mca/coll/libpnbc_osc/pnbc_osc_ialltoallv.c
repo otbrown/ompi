@@ -52,7 +52,7 @@ static int nbc_alltoallv_init(const void* sendbuf, const int *sendcounts, const 
   char *rbuf, *sbuf, inplace;
   ptrdiff_t gap = 0, span;
   void * tmpbuf = NULL;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
 
   NBC_IN_PLACE(sendbuf, recvbuf, inplace);
 
@@ -130,7 +130,7 @@ static int nbc_alltoallv_init(const void* sendbuf, const int *sendcounts, const 
     return res;
   }
 
-  res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, tmpbuf);
+  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
@@ -140,7 +140,7 @@ static int nbc_alltoallv_init(const void* sendbuf, const int *sendcounts, const 
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_ialltoallv(const void* sendbuf, const int *sendcounts, const int *sdispls,
+int ompi_coll_libpnbc_osc_ialltoallv(const void* sendbuf, const int *sendcounts, const int *sdispls,
                                 MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
                                 MPI_Datatype recvtype, struct ompi_communicator_t *comm, ompi_request_t ** request,
                                 struct mca_coll_base_module_2_3_0_t *module) {
@@ -151,9 +151,9 @@ int ompi_coll_libnbc_ialltoallv(const void* sendbuf, const int *sendcounts, cons
         return res;
     }
   
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -170,7 +170,7 @@ static int nbc_alltoallv_inter_init (const void* sendbuf, const int *sendcounts,
   int res, rsize;
   MPI_Aint sndext, rcvext;
   NBC_Schedule *schedule;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
 
 
   res = ompi_datatype_type_extent(sendtype, &sndext);
@@ -219,7 +219,7 @@ static int nbc_alltoallv_inter_init (const void* sendbuf, const int *sendcounts,
     return res;
   }
 
-  res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, NULL);
+  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, NULL);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     return res;
@@ -228,7 +228,7 @@ static int nbc_alltoallv_inter_init (const void* sendbuf, const int *sendcounts,
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_ialltoallv_inter (const void* sendbuf, const int *sendcounts, const int *sdispls,
+int ompi_coll_libpnbc_osc_ialltoallv_inter (const void* sendbuf, const int *sendcounts, const int *sdispls,
 				       MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
 				       MPI_Datatype recvtype, struct ompi_communicator_t *comm, ompi_request_t ** request,
 				       struct mca_coll_base_module_2_3_0_t *module) {
@@ -239,9 +239,9 @@ int ompi_coll_libnbc_ialltoallv_inter (const void* sendbuf, const int *sendcount
         return res;
     }
   
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -388,7 +388,7 @@ static inline int a2av_sched_inplace(int rank, int p, NBC_Schedule *schedule,
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
+int ompi_coll_libpnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                                     MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
                                     MPI_Datatype recvtype, struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                     struct mca_coll_base_module_2_3_0_t *module) {
@@ -401,7 +401,7 @@ int ompi_coll_libnbc_alltoallv_init(const void* sendbuf, const int *sendcounts, 
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_alltoallv_inter_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
+int ompi_coll_libpnbc_osc_alltoallv_inter_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
                                           MPI_Datatype recvtype, struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                           struct mca_coll_base_module_2_3_0_t *module) {

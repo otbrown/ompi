@@ -36,7 +36,7 @@ static int nbc_scatterv_init(const void* sendbuf, const int *sendcounts, const i
   MPI_Aint sndext;
   NBC_Schedule *schedule;
   char *sbuf, inplace = 0;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
 
   rank = ompi_comm_rank (comm);
   if (root == rank) {
@@ -94,7 +94,7 @@ static int nbc_scatterv_init(const void* sendbuf, const int *sendcounts, const i
     return res;
   }
 
-  res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, NULL);
+  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, NULL);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     return res;
@@ -103,7 +103,7 @@ static int nbc_scatterv_init(const void* sendbuf, const int *sendcounts, const i
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_iscatterv(const void* sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
+int ompi_coll_libpnbc_osc_iscatterv(const void* sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
                                void* recvbuf, int recvcount, MPI_Datatype recvtype, int root,
                                struct ompi_communicator_t *comm, ompi_request_t ** request,
                                struct mca_coll_base_module_2_3_0_t *module) {
@@ -112,9 +112,9 @@ int ompi_coll_libnbc_iscatterv(const void* sendbuf, const int *sendcounts, const
     if (OPAL_LIKELY(OMPI_SUCCESS != res)) {
         return res;
     }
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -130,7 +130,7 @@ static int nbc_scatterv_inter_init (const void* sendbuf, const int *sendcounts, 
     MPI_Aint sndext;
     NBC_Schedule *schedule;
     char *sbuf;
-    ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+    ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
 
     rsize = ompi_comm_remote_size (comm);
 
@@ -172,7 +172,7 @@ static int nbc_scatterv_inter_init (const void* sendbuf, const int *sendcounts, 
         return res;
     }
 
-    res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, NULL);
+    res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, NULL);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         OBJ_RELEASE(schedule);
         return res;
@@ -181,7 +181,7 @@ static int nbc_scatterv_inter_init (const void* sendbuf, const int *sendcounts, 
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_iscatterv_inter(const void* sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
+int ompi_coll_libpnbc_osc_iscatterv_inter(const void* sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
                                      void* recvbuf, int recvcount, MPI_Datatype recvtype, int root,
                                      struct ompi_communicator_t *comm, ompi_request_t ** request,
                                      struct mca_coll_base_module_2_3_0_t *module) {
@@ -190,9 +190,9 @@ int ompi_coll_libnbc_iscatterv_inter(const void* sendbuf, const int *sendcounts,
     if (OPAL_LIKELY(OMPI_SUCCESS != res)) {
         return res;
     }
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -200,7 +200,7 @@ int ompi_coll_libnbc_iscatterv_inter(const void* sendbuf, const int *sendcounts,
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_scatterv_init(const void* sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
+int ompi_coll_libpnbc_osc_scatterv_init(const void* sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
                                    void* recvbuf, int recvcount, MPI_Datatype recvtype, int root,
                                    struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                    struct mca_coll_base_module_2_3_0_t *module) {
@@ -213,7 +213,7 @@ int ompi_coll_libnbc_scatterv_init(const void* sendbuf, const int *sendcounts, c
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_scatterv_inter_init(const void* sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
+int ompi_coll_libpnbc_osc_scatterv_inter_init(const void* sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
                                          void* recvbuf, int recvcount, MPI_Datatype recvtype, int root,
                                          struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                          struct mca_coll_base_module_2_3_0_t *module) {
