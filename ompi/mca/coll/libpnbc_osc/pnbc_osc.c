@@ -305,8 +305,10 @@ static int NBC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datat
 
 int NBC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
                          int target, NBC_Schedule *schedule, bool barrier) {
-  return NBC_Sched_recv_internal(buf, tmpbuf, origin_count, origin_datatype, target, true,
-                                 schedule, barrier);
+  printf("No implementation yet\n");
+  exit(0);
+  /* return NBC_Sched_recv_internal(buf, tmpbuf, origin_count, origin_datatype, target, true, */
+  /*                                schedule, barrier); */
 }
 
 
@@ -588,7 +590,7 @@ static inline int NBC_Start_round(NBC_Handle *handle) {
   NBC_Args_op         opargs;
   NBC_Args_copy     copyargs;
   NBC_Args_unpack unpackargs;
-  NBC_Args_win_free wfreeargs;
+
 
   void *buf1,  *buf2;
 
