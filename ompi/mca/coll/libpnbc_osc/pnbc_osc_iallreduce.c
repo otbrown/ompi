@@ -72,7 +72,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   enum { NBC_ARED_BINOMIAL, NBC_ARED_RING, NBC_ARED_REDSCAT_ALLGATHER } alg;
   char inplace;
   void *tmpbuf = NULL;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
   ptrdiff_t span, gap;
 
   NBC_IN_PLACE(sendbuf, recvbuf, inplace);
@@ -111,7 +111,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
 
   /* algorithm selection */
   int nprocs_pof2 = opal_next_poweroftwo(p) >> 1;
-  if (libnbc_iallreduce_algorithm == 0) {
+  if (libpnbc_osc_iallreduce_algorithm == 0) {
     if(p < 4 || size*count < 65536 || !ompi_op_is_commute(op) || inplace) {
       alg = NBC_ARED_BINOMIAL;
     } else if (count >= nprocs_pof2 && ompi_op_is_commute(op)) {
@@ -120,11 +120,11 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
       alg = NBC_ARED_RING;
     }
   } else {
-    if (libnbc_iallreduce_algorithm == 1)
+    if (libpnbc_osc_iallreduce_algorithm == 1)
       alg = NBC_ARED_RING;
-    else if (libnbc_iallreduce_algorithm == 2)
+    else if (libpnbc_osc_iallreduce_algorithm == 2)
       alg = NBC_ARED_BINOMIAL;
-    else if (libnbc_iallreduce_algorithm == 3 && count >= nprocs_pof2 && ompi_op_is_commute(op)) {
+    else if (libpnbc_osc_iallreduce_algorithm == 3 && count >= nprocs_pof2 && ompi_op_is_commute(op)) {
       alg = NBC_ARED_REDSCAT_ALLGATHER;
     } else
       alg = NBC_ARED_RING;
@@ -136,7 +136,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   search.count = count;
   search.datatype = datatype;
   search.op = op;
-  found = (NBC_Allreduce_args *) hb_tree_search ((hb_tree *) libnbc_module->NBC_Dict[NBC_ALLREDUCE], &search);
+  found = (NBC_Allreduce_args *) hb_tree_search ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_ALLREDUCE], &search);
   if (NULL == found) {
 #endif
     schedule = OBJ_NEW(NBC_Schedule);
@@ -185,14 +185,14 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
       args->datatype = datatype;
       args->op = op;
       args->schedule = schedule;
-      res = hb_tree_insert ((hb_tree *) libnbc_module->NBC_Dict[NBC_ALLREDUCE], args, args, 0);
+      res = hb_tree_insert ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_ALLREDUCE], args, args, 0);
       if (0 == res) {
         OBJ_RETAIN(schedule);
 
         /* increase number of elements for A2A */
-        if (++libnbc_module->NBC_Dict_size[NBC_ALLREDUCE] > NBC_SCHED_DICT_UPPER) {
-          NBC_SchedCache_dictwipe ((hb_tree *) libnbc_module->NBC_Dict[NBC_ALLREDUCE],
-                                   &libnbc_module->NBC_Dict_size[NBC_ALLREDUCE]);
+        if (++libpnbc_osc_module->NBC_Dict_size[NBC_ALLREDUCE] > NBC_SCHED_DICT_UPPER) {
+          NBC_SchedCache_dictwipe ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_ALLREDUCE],
+                                   &libpnbc_osc_module->NBC_Dict_size[NBC_ALLREDUCE]);
         }
       } else {
         NBC_Error("error in dict_insert() (%i)", res);
@@ -206,7 +206,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   }
 #endif
 
-  res = NBC_Schedule_request (schedule, comm, libnbc_module, persistent, request, tmpbuf);
+  res = NBC_Schedule_request (schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
@@ -216,7 +216,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_iallreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+int ompi_coll_libpnbc_osc_iallreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
                                 struct ompi_communicator_t *comm, ompi_request_t ** request,
                                 struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op,
@@ -225,9 +225,9 @@ int ompi_coll_libnbc_iallreduce(const void* sendbuf, void* recvbuf, int count, M
         return res;
     }
   
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -244,7 +244,7 @@ static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int coun
   MPI_Aint ext;
   NBC_Schedule *schedule;
   void *tmpbuf = NULL;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
   ptrdiff_t span, gap;
 
   rank = ompi_comm_rank (comm);
@@ -289,7 +289,7 @@ static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int coun
     return res;
   }
 
-  res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, tmpbuf);
+  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
@@ -299,7 +299,7 @@ static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int coun
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_iallreduce_inter(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+int ompi_coll_libpnbc_osc_iallreduce_inter(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
                                       struct ompi_communicator_t *comm, ompi_request_t ** request,
                                       struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
@@ -308,9 +308,9 @@ int ompi_coll_libnbc_iallreduce_inter(const void* sendbuf, void* recvbuf, int co
         return res;
     }
   
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -1021,7 +1021,7 @@ static inline int allred_sched_redscat_allgather(
     return res;
 }
 
-int ompi_coll_libnbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+int ompi_coll_libpnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
                                     struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                     struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op,
@@ -1033,7 +1033,7 @@ int ompi_coll_libnbc_allreduce_init(const void* sendbuf, void* recvbuf, int coun
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+int ompi_coll_libpnbc_osc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
                                           struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                           struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
