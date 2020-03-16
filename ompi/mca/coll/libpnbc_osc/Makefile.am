@@ -30,6 +30,7 @@ sources = \
 	pnbc_osc_iallgather.c \
 	pnbc_osc_iallgatherv.c \
 	pnbc_osc_iallreduce.c \
+	pnbc_osc_rallreduce.c \
 	pnbc_osc_ialltoall.c \
 	pnbc_osc_ialltoallv.c \
 	pnbc_osc_ialltoallw.c \
