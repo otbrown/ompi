@@ -168,6 +168,13 @@ static int nbc_rallreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Data
     }
   }
 
+  res = NBC_Sched_win_free(schedule, true);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    OBJ_RELEASE(schedule);
+    free(tmpbuf);
+    return res;
+  }
+
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
@@ -192,10 +199,11 @@ static int nbc_rallreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Data
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libpnbc_osc_rallreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
-                                     MPI_Op op, struct ompi_communicator_t *comm, ompi_request_t ** request,
+int ompi_coll_libpnbc_osc_rallreduce(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+                                     MPI_Op op, struct ompi_communicator_t *comm,
+                                     ompi_request_t ** request,
                                      struct mca_coll_base_module_2_3_0_t *module) {
-
+  
   int res = nbc_rallreduce_init(sendbuf, recvbuf, count, datatype, op, comm, request, module, false);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     return res;
