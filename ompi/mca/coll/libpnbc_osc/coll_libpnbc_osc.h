@@ -164,7 +164,7 @@ int ompi_coll_libpnbc_osc_iallgatherv(const void* sendbuf, int sendcount, MPI_Da
 int ompi_coll_libpnbc_osc_iallreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
                                 struct ompi_communicator_t *comm, ompi_request_t ** request,
                                 struct mca_coll_base_module_2_3_0_t *module);
-int ompi_coll_libpnbc_osc_rallreduce(const void* sendbuf, void* recvbuf, int count,
+int ompi_coll_libpnbc_osc_rallreduce(void* sendbuf, void* recvbuf, int count,
                                      MPI_Datatype datatype, MPI_Op op,
                                      struct ompi_communicator_t *comm, ompi_request_t ** request,
                                      struct mca_coll_base_module_2_3_0_t *module);
