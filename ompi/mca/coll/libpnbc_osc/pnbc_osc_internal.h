@@ -478,7 +478,7 @@ extern "C" {
     if(NBC_DLEVEL >= level) {
       MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-      printf("[LibNBC - %i] ", rank);
+      printf("[LibPNBC - %i] ", rank);
       va_start(ap, fmt);
       vprintf(fmt, ap);
       va_end (ap);
