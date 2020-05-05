@@ -61,7 +61,7 @@ static int nbc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype s
   NBC_Allgather_args *args, *found, search;
 #endif
   enum { NBC_ALLGATHER_LINEAR, NBC_ALLGATHER_RDBL} alg;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
 
   NBC_IN_PLACE(sendbuf, recvbuf, inplace);
 
@@ -69,13 +69,13 @@ static int nbc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype s
   p = ompi_comm_size (comm);
   int is_commsize_pow2 = !(p & (p - 1));
 
-  if (libnbc_iallgather_algorithm == 0) {
+  if (libpnbc_osc_iallgather_algorithm == 0) {
     alg = NBC_ALLGATHER_LINEAR;
   } else {
     /* user forced dynamic decision */
-    if (libnbc_iallgather_algorithm == 1) {
+    if (libpnbc_osc_iallgather_algorithm == 1) {
       alg = NBC_ALLGATHER_LINEAR;
-    } else if (libnbc_iallgather_algorithm == 2 && is_commsize_pow2) {
+    } else if (libpnbc_osc_iallgather_algorithm == 2 && is_commsize_pow2) {
       alg = NBC_ALLGATHER_RDBL;
     } else {
       alg = NBC_ALLGATHER_LINEAR;
@@ -110,7 +110,7 @@ static int nbc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype s
   search.recvbuf = recvbuf;
   search.recvcount = recvcount;
   search.recvtype = recvtype;
-  found = (NBC_Allgather_args *) hb_tree_search ((hb_tree*)libnbc_module->NBC_Dict[NBC_ALLGATHER], &search);
+  found = (NBC_Allgather_args *) hb_tree_search ((hb_tree*)libpnbc_osc_module->NBC_Dict[NBC_ALLGATHER], &search);
   if (NULL == found) {
 #endif
     schedule = OBJ_NEW(NBC_Schedule);
@@ -163,7 +163,7 @@ static int nbc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype s
     args->recvtype = recvtype;
     args->schedule = schedule;
 
-    res = hb_tree_insert ((hb_tree *) libnbc_module->NBC_Dict[NBC_ALLGATHER], args, args, 0);
+    res = hb_tree_insert ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_ALLGATHER], args, args, 0);
     if (res != 0) {
       free (args);
     } else {
@@ -171,8 +171,8 @@ static int nbc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype s
     }
 
     /* increase number of elements for A2A */
-    if (++libnbc_module->NBC_Dict_size[NBC_ALLGATHER] > NBC_SCHED_DICT_UPPER) {
-      NBC_SchedCache_dictwipe ((hb_tree *) libnbc_module->NBC_Dict[NBC_ALLGATHER], &libnbc_module->NBC_Dict_size[NBC_ALLGATHER]);
+    if (++libpnbc_osc_module->NBC_Dict_size[NBC_ALLGATHER] > NBC_SCHED_DICT_UPPER) {
+      NBC_SchedCache_dictwipe ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_ALLGATHER], &libpnbc_osc_module->NBC_Dict_size[NBC_ALLGATHER]);
     }
   } else {
     /* found schedule */
@@ -181,7 +181,7 @@ static int nbc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype s
   }
 #endif
 
-  res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, NULL);
+  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, NULL);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     return res;
@@ -190,7 +190,7 @@ static int nbc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype s
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_iallgather(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
+int ompi_coll_libpnbc_osc_iallgather(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
                                 MPI_Datatype recvtype, struct ompi_communicator_t *comm, ompi_request_t ** request,
                                 struct mca_coll_base_module_2_3_0_t *module)
 {
@@ -200,9 +200,9 @@ int ompi_coll_libnbc_iallgather(const void* sendbuf, int sendcount, MPI_Datatype
         return res;
     }
   
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -218,7 +218,7 @@ static int nbc_allgather_inter_init(const void* sendbuf, int sendcount, MPI_Data
   MPI_Aint rcvext;
   NBC_Schedule *schedule;
   char *rbuf;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
 
   res = ompi_datatype_type_extent(recvtype, &rcvext);
   if (MPI_SUCCESS != res) {
@@ -258,7 +258,7 @@ static int nbc_allgather_inter_init(const void* sendbuf, int sendcount, MPI_Data
     return res;
   }
 
-  res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, NULL);
+  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, NULL);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     return res;
@@ -267,7 +267,7 @@ static int nbc_allgather_inter_init(const void* sendbuf, int sendcount, MPI_Data
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_iallgather_inter(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
+int ompi_coll_libpnbc_osc_iallgather_inter(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
 				      MPI_Datatype recvtype, struct ompi_communicator_t *comm, ompi_request_t ** request,
 				      struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_allgather_inter_init(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype,
@@ -276,9 +276,9 @@ int ompi_coll_libnbc_iallgather_inter(const void* sendbuf, int sendcount, MPI_Da
         return res;
     }
 
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -389,7 +389,7 @@ cleanup_and_return:
     return res;
 }
 
-int ompi_coll_libnbc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
+int ompi_coll_libpnbc_osc_allgather_init(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
                                     MPI_Datatype recvtype, struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                     struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_allgather_init(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype,
@@ -401,7 +401,7 @@ int ompi_coll_libnbc_allgather_init(const void* sendbuf, int sendcount, MPI_Data
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_allgather_inter_init(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
+int ompi_coll_libpnbc_osc_allgather_inter_init(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
                                           MPI_Datatype recvtype, struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                           struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_allgather_inter_init(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype,
