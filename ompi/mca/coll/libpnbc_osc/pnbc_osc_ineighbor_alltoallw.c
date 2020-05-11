@@ -48,7 +48,7 @@ static int nbc_neighbor_alltoallw_init(const void *sbuf, const int *scounts, con
                                        struct ompi_communicator_t *comm, ompi_request_t ** request,
                                        struct mca_coll_base_module_2_3_0_t *module, bool persistent) {
   int res, indegree, outdegree, *srcs, *dsts;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
   NBC_Schedule *schedule;
 
 #ifdef NBC_CACHE_SCHEDULE
@@ -61,7 +61,7 @@ static int nbc_neighbor_alltoallw_init(const void *sbuf, const int *scounts, con
   search.rbuf = rbuf;
   search.rcount = rcount;
   search.rtype = rtype;
-  found = (NBC_Ineighbor_alltoallw_args *) hb_tree_search ((hb_tree *) libnbc_module->NBC_Dict[NBC_NEIGHBOR_ALLTOALLW],
+  found = (NBC_Ineighbor_alltoallw_args *) hb_tree_search ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_NEIGHBOR_ALLTOALLW],
                                                            &search);
   if(found == NULL) {
 #endif
@@ -127,14 +127,14 @@ static int nbc_neighbor_alltoallw_init(const void *sbuf, const int *scounts, con
       args->rcount = rcount;
       args->rtype = rtype;
       args->schedule = schedule;
-      res = hb_tree_insert ((hb_tree *) libnbc_module->NBC_Dict[NBC_NEIGHBOR_ALLTOALLW], args, args, 0);
+      res = hb_tree_insert ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_NEIGHBOR_ALLTOALLW], args, args, 0);
       if (0 == res) {
         OBJ_RETAIN(schedule);
 
         /* increase number of elements for A2A */
-        if (++libnbc_module->NBC_Dict_size[NBC_NEIGHBOR_ALLTOALLW] > NBC_SCHED_DICT_UPPER) {
-          NBC_SchedCache_dictwipe ((hb_tree *) libnbc_module->NBC_Dict[NBC_NEIGHBOR_ALLTOALLW],
-                                   &libnbc_module->NBC_Dict_size[NBC_NEIGHBOR_ALLTOALLW]);
+        if (++libpnbc_osc_module->NBC_Dict_size[NBC_NEIGHBOR_ALLTOALLW] > NBC_SCHED_DICT_UPPER) {
+          NBC_SchedCache_dictwipe ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_NEIGHBOR_ALLTOALLW],
+                                   &libpnbc_osc_module->NBC_Dict_size[NBC_NEIGHBOR_ALLTOALLW]);
         }
       } else {
         NBC_Error("error in dict_insert() (%i)", res);
@@ -147,7 +147,7 @@ static int nbc_neighbor_alltoallw_init(const void *sbuf, const int *scounts, con
   }
 #endif
 
-  res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, NULL);
+  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, NULL);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     return res;
@@ -156,7 +156,7 @@ static int nbc_neighbor_alltoallw_init(const void *sbuf, const int *scounts, con
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_ineighbor_alltoallw(const void *sbuf, const int *scounts, const MPI_Aint *sdisps, struct ompi_datatype_t * const *stypes,
+int ompi_coll_libpnbc_osc_ineighbor_alltoallw(const void *sbuf, const int *scounts, const MPI_Aint *sdisps, struct ompi_datatype_t * const *stypes,
                                          void *rbuf, const int *rcounts, const MPI_Aint *rdisps, struct ompi_datatype_t * const *rtypes,
                                          struct ompi_communicator_t *comm, ompi_request_t ** request,
                                          struct mca_coll_base_module_2_3_0_t *module) {
@@ -165,9 +165,9 @@ int ompi_coll_libnbc_ineighbor_alltoallw(const void *sbuf, const int *scounts, c
     if (OPAL_LIKELY(OMPI_SUCCESS != res)) {
         return res;
     }
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -175,7 +175,7 @@ int ompi_coll_libnbc_ineighbor_alltoallw(const void *sbuf, const int *scounts, c
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_neighbor_alltoallw_init(const void *sbuf, const int *scounts, const MPI_Aint *sdisps, struct ompi_datatype_t * const *stypes,
+int ompi_coll_libpnbc_osc_neighbor_alltoallw_init(const void *sbuf, const int *scounts, const MPI_Aint *sdisps, struct ompi_datatype_t * const *stypes,
                                              void *rbuf, const int *rcounts, const MPI_Aint *rdisps, struct ompi_datatype_t * const *rtypes,
                                              struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                              struct mca_coll_base_module_2_3_0_t *module) {
