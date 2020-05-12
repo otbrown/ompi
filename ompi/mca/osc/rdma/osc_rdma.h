@@ -583,6 +583,43 @@ static inline void ompi_osc_rdma_sync_rdma_complete (ompi_osc_rdma_sync_t *sync)
 }
 
 /**
+ * @brief Nonblocking complete all outstanding rdma operations to all peers
+ *
+ * @param[in] module          osc rdma module
+ * 
+ * @returns OMPI_ERR_RMA_NB_PENDING Complete is still pending, try again later
+ * @returns OMPI_SUCCESS Complete has executed correctly
+ */
+static inline int ompi_osc_rdma_sync_rdma_icomplete (ompi_osc_rdma_sync_t *sync)
+{
+
+#if !defined(BTL_VERSION) || (BTL_VERSION < 310)
+    opal_progress ();
+    /* there are still outstanding rdma operations */
+    if (ompi_osc_rdma_sync_get_count (sync)){
+        return OMPI_ERR_RMA_NB_PENDING;        
+    }else{
+        return OMPI_SUCCESS;
+    }
+#else
+    mca_btl_base_module_t *btl_module = sync->module->selected_btl;
+    if (!ompi_osc_rdma_use_btl_flush (sync->module)) {
+            opal_progress ();
+        } else {
+            btl_module->btl_flush (btl_module, NULL);
+     } 
+    
+     if (ompi_osc_rdma_sync_get_count (sync)         ||
+         (sync->module->rdma_frag  &&  (sync->module->rdma_frag->pending > 1))){
+         return OMPI_ERR_RMA_NB_PENDING; 
+     }else{
+         return OMPI_SUCCESS;
+     }
+#endif
+}
+
+
+/**
  * @brief check if an access epoch is active
  *
  * @param[in] module        osc rdma module
