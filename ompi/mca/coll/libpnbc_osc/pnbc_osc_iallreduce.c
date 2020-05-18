@@ -52,7 +52,9 @@ static int nbc_allreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Datat
   NBC_Schedule *schedule;
   size_t size;
   ompi_win_t *win;
-  opal_info_t *info =  MPI_INFO_NULL;
+  struct ompi_info_t * info = &ompi_mpi_info_null.info;
+  //  ret = ompi_win_create_dynamic(&info_null->super, comm, win);
+  //opal_info_t *info =  MPI_INFO_NULL;
   enum { NBC_ARED_BINOMIAL, NBC_ARED_RING, NBC_ARED_REDSCAT_ALLGATHER } alg;
   char inplace;
   void *tmpbuf = NULL;
@@ -98,7 +100,7 @@ static int nbc_allreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Datat
 
     /* create an MPI dynamic Window */
   NBC_DEBUG(1, "[nbc_allreduce_init] Enter create MPI Window dynamic \n");
-  res = ompi_win_create_dynamic(info, comm, &win);
+  res = ompi_win_create_dynamic(&info->super, comm, &win);
   if (OMPI_SUCCESS != res) {
     NBC_Error ("MPI Error in win_create_dynamic (%i)", res);
     free(tmpbuf);
