@@ -27,7 +27,7 @@
 #include <assert.h>
 
 static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype datatype, ptrdiff_t gap,
-                                    void *sendbuf, void *recvbuf, MPI_Op op, char inplace,
+                                     void *sendbuf, void *recvbuf, MPI_Op op, char inplace,
                                     NBC_Schedule *schedule, void *tmpbuf, ompi_request_t ** request);
 static inline int allred_sched_ring(int rank, int p, int count, MPI_Datatype datatype,
                                     const void *sendbuf, void *recvbuf, MPI_Op op, int size, int ext,
@@ -43,7 +43,7 @@ static inline int allred_sched_redscat_allgather( int rank, int comm_size, int c
                                                   void *tmpbuf, struct ompi_communicator_t *comm);
 
 
-static int nbc_allreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                                MPI_Op op, struct ompi_communicator_t *comm, ompi_request_t **request,
                                struct mca_coll_base_module_2_3_0_t *module, bool persistent)
 {
@@ -58,6 +58,7 @@ static int nbc_allreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Datat
   enum { NBC_ARED_BINOMIAL, NBC_ARED_RING, NBC_ARED_REDSCAT_ALLGATHER } alg;
   char inplace;
   void *tmpbuf = NULL;
+  void *tmpsbuf = NULL;
   ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
   ptrdiff_t span, gap;
   MPI_Aint disp, *disp_a;
@@ -98,19 +99,24 @@ static int nbc_allreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Datat
   }
   NBC_DEBUG(1, "[nbc_allreduce_init] Checking parameters - OK \n");
 
-    /* create an MPI dynamic Window */
+  /* make a copy of the send buffer - we now have a writable send buffer */
+  memcpy(tmpsbuf, sendbuf, size*count);
+
+  /* create an MPI dynamic Window */
   NBC_DEBUG(1, "[nbc_allreduce_init] Enter create MPI Window dynamic \n");
   res = ompi_win_create_dynamic(&info->super, comm, &win);
   if (OMPI_SUCCESS != res) {
     NBC_Error ("MPI Error in win_create_dynamic (%i)", res);
     free(tmpbuf);
+    free(tmpsbuf);
     return res;
   }
   NBC_DEBUG(1, "[nbc_allreduce_init] Create MPI Window dynamic - OK \n");
 
   NBC_DEBUG(1, "[nbc_allreduce_init] Enter attach window dynamic \n");
+
   /* Attach window to sendbuf */
-  res = win->w_osc_module->osc_win_attach(win, sendbuf, count*size);
+  res = win->w_osc_module->osc_win_attach(win, tmpsbuf, count*size);
   NBC_DEBUG(1, "[nbc_allreduce_init] Attach MPI Window dynamic - OK \n");
   
   /* MPI Get_address  */
@@ -162,7 +168,7 @@ static int nbc_allreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Datat
   } else {
     switch(alg) {
     case NBC_ARED_BINOMIAL:
-      res = allred_sched_diss(rank, p, count, datatype, gap, sendbuf, recvbuf, op, inplace,
+      res = allred_sched_diss(rank, p, count, datatype, gap, tmpsbuf, recvbuf, op, inplace,
                               schedule, tmpbuf, request);
       break;
     case NBC_ARED_REDSCAT_ALLGATHER:
@@ -207,7 +213,7 @@ static int nbc_allreduce_init(void* sendbuf, void* recvbuf, int count, MPI_Datat
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libpnbc_osc_iallreduce(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+int ompi_coll_libpnbc_osc_iallreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                                      MPI_Op op, struct ompi_communicator_t *comm,
                                      ompi_request_t ** request,
                                      struct mca_coll_base_module_2_3_0_t *module) {
