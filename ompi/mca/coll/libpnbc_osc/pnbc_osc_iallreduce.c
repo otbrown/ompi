@@ -100,6 +100,7 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   NBC_DEBUG(1, "[nbc_allreduce_init] Checking parameters - OK \n");
 
   /* make a copy of the send buffer - we now have a writable send buffer */
+  tmpsbuf = malloc(size*count);
   memcpy(tmpsbuf, sendbuf, size*count);
 
   /* create an MPI dynamic Window */
