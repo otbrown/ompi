@@ -50,7 +50,7 @@ static int nbc_neighbor_allgatherv_init(const void *sbuf, int scount, MPI_Dataty
                                         struct mca_coll_base_module_2_3_0_t *module, bool persistent) {
   int res, indegree, outdegree, *srcs, *dsts;
   MPI_Aint rcvext;
-  ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+  ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
   NBC_Schedule *schedule;
 
   res = ompi_datatype_type_extent(rtype, &rcvext);
@@ -69,7 +69,7 @@ static int nbc_neighbor_allgatherv_init(const void *sbuf, int scount, MPI_Dataty
   search.rbuf = rbuf;
   search.rcount = rcount;
   search.rtype = rtype;
-  found = (NBC_Ineighbor_allgatherv_args *) hb_tree_search ((hb_tree *) libnbc_module->NBC_Dict[NBC_NEIGHBOR_ALLGATHERV],
+  found = (NBC_Ineighbor_allgatherv_args *) hb_tree_search ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_NEIGHBOR_ALLGATHERV],
                                                             &search);
   if (NULL == found) {
 #endif
@@ -134,14 +134,14 @@ static int nbc_neighbor_allgatherv_init(const void *sbuf, int scount, MPI_Dataty
       args->rcount = rcount;
       args->rtype = rtype;
       args->schedule = schedule;
-      res = hb_tree_insert ((hb_tree *) libnbc_module->NBC_Dict[NBC_NEIGHBOR_ALLGATHERV], args, args, 0);
+      res = hb_tree_insert ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_NEIGHBOR_ALLGATHERV], args, args, 0);
       if (0 == res) {
         OBJ_RETAIN(schedule);
 
         /* increase number of elements for A2A */
-        if(++libnbc_module->NBC_Dict_size[NBC_NEIGHBOR_ALLGATHERV] > NBC_SCHED_DICT_UPPER) {
-          NBC_SchedCache_dictwipe ((hb_tree *) libnbc_module->NBC_Dict[NBC_NEIGHBOR_ALLGATHERV],
-                                   &libnbc_module->NBC_Dict_size[NBC_NEIGHBOR_ALLGATHERV]);
+        if(++libpnbc_osc_module->NBC_Dict_size[NBC_NEIGHBOR_ALLGATHERV] > NBC_SCHED_DICT_UPPER) {
+          NBC_SchedCache_dictwipe ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_NEIGHBOR_ALLGATHERV],
+                                   &libpnbc_osc_module->NBC_Dict_size[NBC_NEIGHBOR_ALLGATHERV]);
         }
       } else {
         NBC_Error("error in dict_insert() (%i)", res);
@@ -155,7 +155,7 @@ static int nbc_neighbor_allgatherv_init(const void *sbuf, int scount, MPI_Dataty
   }
 #endif
 
-  res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, NULL);
+  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, NULL);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     return res;
@@ -164,7 +164,7 @@ static int nbc_neighbor_allgatherv_init(const void *sbuf, int scount, MPI_Dataty
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_ineighbor_allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+int ompi_coll_libpnbc_osc_ineighbor_allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
 					  const int *rcounts, const int *displs, MPI_Datatype rtype,
 					  struct ompi_communicator_t *comm, ompi_request_t ** request,
 					  struct mca_coll_base_module_2_3_0_t *module) {
@@ -173,9 +173,9 @@ int ompi_coll_libnbc_ineighbor_allgatherv(const void *sbuf, int scount, MPI_Data
     if (OPAL_LIKELY(OMPI_SUCCESS != res)) {
         return res;
     }
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -183,7 +183,7 @@ int ompi_coll_libnbc_ineighbor_allgatherv(const void *sbuf, int scount, MPI_Data
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_neighbor_allgatherv_init(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+int ompi_coll_libpnbc_osc_neighbor_allgatherv_init(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
                                               const int *rcounts, const int *displs, MPI_Datatype rtype,
                                               struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                               struct mca_coll_base_module_2_3_0_t *module) {

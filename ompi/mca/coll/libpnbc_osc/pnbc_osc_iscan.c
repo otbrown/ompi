@@ -60,7 +60,7 @@ static int nbc_scan_init(const void* sendbuf, void* recvbuf, int count, MPI_Data
     void *tmpbuf = NULL, *tmpbuf1 = NULL, *tmpbuf2 = NULL;
     enum { NBC_SCAN_LINEAR, NBC_SCAN_RDBL } alg;
     char inplace;
-    ompi_coll_libnbc_module_t *libnbc_module = (ompi_coll_libnbc_module_t*) module;
+    ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
 
     NBC_IN_PLACE(sendbuf, recvbuf, inplace);
 
@@ -72,7 +72,7 @@ static int nbc_scan_init(const void* sendbuf, void* recvbuf, int count, MPI_Data
     }
 
     span = opal_datatype_span(&datatype->super, count, &gap);
-    if (libnbc_iscan_algorithm == 2) {
+    if (libpnbc_osc_iscan_algorithm == 2) {
         alg = NBC_SCAN_RDBL;
         ptrdiff_t span_align = OPAL_ALIGN(span, datatype->super.align, ptrdiff_t);
         tmpbuf = malloc(span_align + span);
@@ -96,7 +96,7 @@ static int nbc_scan_init(const void* sendbuf, void* recvbuf, int count, MPI_Data
   search.count = count;
   search.datatype = datatype;
   search.op = op;
-  found = (NBC_Scan_args *) hb_tree_search ((hb_tree *) libnbc_module->NBC_Dict[NBC_SCAN], &search);
+  found = (NBC_Scan_args *) hb_tree_search ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_SCAN], &search);
   if (NULL == found) {
 #endif
     schedule = OBJ_NEW(NBC_Schedule);
@@ -135,14 +135,14 @@ static int nbc_scan_init(const void* sendbuf, void* recvbuf, int count, MPI_Data
       args->datatype = datatype;
       args->op = op;
       args->schedule = schedule;
-      res = hb_tree_insert ((hb_tree *) libnbc_module->NBC_Dict[NBC_SCAN], args, args, 0);
+      res = hb_tree_insert ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_SCAN], args, args, 0);
       if (0 == res) {
         OBJ_RETAIN(schedule);
 
         /* increase number of elements for A2A */
-        if (++libnbc_module->NBC_Dict_size[NBC_SCAN] > NBC_SCHED_DICT_UPPER) {
-          NBC_SchedCache_dictwipe ((hb_tree *) libnbc_module->NBC_Dict[NBC_SCAN],
-                                   &libnbc_module->NBC_Dict_size[NBC_SCAN]);
+        if (++libpnbc_osc_module->NBC_Dict_size[NBC_SCAN] > NBC_SCHED_DICT_UPPER) {
+          NBC_SchedCache_dictwipe ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_SCAN],
+                                   &libpnbc_osc_module->NBC_Dict_size[NBC_SCAN]);
         }
       } else {
         NBC_Error("error in dict_insert() (%i)", res);
@@ -156,7 +156,7 @@ static int nbc_scan_init(const void* sendbuf, void* recvbuf, int count, MPI_Data
   }
 #endif
 
-    res = NBC_Schedule_request(schedule, comm, libnbc_module, persistent, request, tmpbuf);
+    res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         OBJ_RELEASE(schedule);
         free(tmpbuf);
@@ -312,7 +312,7 @@ static inline int scan_sched_recursivedoubling(
     return res;
 }
 
-int ompi_coll_libnbc_iscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+int ompi_coll_libpnbc_osc_iscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
                            struct ompi_communicator_t *comm, ompi_request_t ** request,
                            struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_scan_init(sendbuf, recvbuf, count, datatype, op,
@@ -320,9 +320,9 @@ int ompi_coll_libnbc_iscan(const void* sendbuf, void* recvbuf, int count, MPI_Da
     if (OPAL_LIKELY(OMPI_SUCCESS != res)) {
         return res;
     }
-    res = NBC_Start(*(ompi_coll_libnbc_request_t **)request);
+    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libnbc_request_t **)request);
+        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
         *request = &ompi_request_null.request;
         return res;
     }
@@ -330,7 +330,7 @@ int ompi_coll_libnbc_iscan(const void* sendbuf, void* recvbuf, int count, MPI_Da
     return OMPI_SUCCESS;
 }
 
-int ompi_coll_libnbc_scan_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+int ompi_coll_libpnbc_osc_scan_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
                                struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
                                struct mca_coll_base_module_2_3_0_t *module) {
     int res = nbc_scan_init(sendbuf, recvbuf, count, datatype, op,
