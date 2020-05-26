@@ -326,7 +326,7 @@ libpnbc_osc_comm_query(struct ompi_communicator_t *comm,
         module->super.coll_igatherv = ompi_coll_libpnbc_osc_igatherv_inter;
         module->super.coll_ireduce = ompi_coll_libpnbc_osc_ireduce_inter;
         module->super.coll_ireduce_scatter = ompi_coll_libpnbc_osc_ireduce_scatter_inter;
-        //    module->super.coll_ireduce_scatter_block = ompi_coll_libpnbc_osc_ireduce_scatter_block_inter;
+        module->super.coll_ireduce_scatter_block = ompi_coll_libpnbc_osc_ireduce_scatter_block_inter;
         module->super.coll_iscan = NULL;
         module->super.coll_iscatter = ompi_coll_libpnbc_osc_iscatter_inter;
         module->super.coll_iscatterv = ompi_coll_libpnbc_osc_iscatterv_inter;
@@ -344,7 +344,7 @@ libpnbc_osc_comm_query(struct ompi_communicator_t *comm,
         module->super.coll_gatherv_init = ompi_coll_libpnbc_osc_gatherv_inter_init;
         module->super.coll_reduce_init = ompi_coll_libpnbc_osc_reduce_inter_init;
         module->super.coll_reduce_scatter_init = ompi_coll_libpnbc_osc_reduce_scatter_inter_init;
-        //     module->super.coll_reduce_scatter_block_init = ompi_coll_libpnbc_osc_reduce_scatter_block_inter_init;
+        module->super.coll_reduce_scatter_block_init = ompi_coll_libpnbc_osc_reduce_scatter_block_inter_init;
         module->super.coll_scan_init = NULL;
         module->super.coll_scatter_init = ompi_coll_libpnbc_osc_scatter_inter_init;
         module->super.coll_scatterv_init = ompi_coll_libpnbc_osc_scatterv_inter_init;
@@ -362,7 +362,7 @@ libpnbc_osc_comm_query(struct ompi_communicator_t *comm,
         module->super.coll_igatherv = ompi_coll_libpnbc_osc_igatherv;
         module->super.coll_ireduce = ompi_coll_libpnbc_osc_ireduce;
         module->super.coll_ireduce_scatter = ompi_coll_libpnbc_osc_ireduce_scatter;
-        //   module->super.coll_ireduce_scatter_block = ompi_coll_libpnbc_osc_ireduce_scatter_block;
+        module->super.coll_ireduce_scatter_block = ompi_coll_libpnbc_osc_ireduce_scatter_block;
         module->super.coll_iscan = ompi_coll_libpnbc_osc_iscan;
         module->super.coll_iscatter = ompi_coll_libpnbc_osc_iscatter;
         module->super.coll_iscatterv = ompi_coll_libpnbc_osc_iscatterv;
@@ -386,7 +386,7 @@ libpnbc_osc_comm_query(struct ompi_communicator_t *comm,
         module->super.coll_gatherv_init = ompi_coll_libpnbc_osc_gatherv_init;
         module->super.coll_reduce_init = ompi_coll_libpnbc_osc_reduce_init;
         module->super.coll_reduce_scatter_init = ompi_coll_libpnbc_osc_reduce_scatter_init;
-        //module->super.coll_reduce_scatter_block_init = ompi_coll_libpnbc_osc_reduce_scatter_block_init;
+        module->super.coll_reduce_scatter_block_init = ompi_coll_libpnbc_osc_reduce_scatter_block_init;
         module->super.coll_scan_init = ompi_coll_libpnbc_osc_scan_init;
         module->super.coll_scatter_init = ompi_coll_libpnbc_osc_scatter_init;
         module->super.coll_scatterv_init = ompi_coll_libpnbc_osc_scatterv_init;
