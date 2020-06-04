@@ -27,29 +27,7 @@ sources = \
 	coll_libpnbc_osc_component.c \
 	pnbc_osc.c \
 	pnbc_osc_internal.h \
-	pnbc_osc_iallgather.c \
-	pnbc_osc_iallgatherv.c \
-	pnbc_osc_iallreduce.c \
-	pnbc_osc_ialltoall.c \
-	pnbc_osc_ialltoallv.c \
-	pnbc_osc_ialltoallw.c \
-	pnbc_osc_ibarrier.c \
-	pnbc_osc_ibcast.c \
-	pnbc_osc_iexscan.c \
-	pnbc_osc_igather.c \
-	pnbc_osc_igatherv.c \
-	pnbc_osc_ineighbor_allgather.c \
-	pnbc_osc_ineighbor_allgatherv.c \
-	pnbc_osc_ineighbor_alltoall.c \
-	pnbc_osc_ineighbor_alltoallv.c \
-	pnbc_osc_ineighbor_alltoallw.c \
-	pnbc_osc_ireduce.c \
-	pnbc_osc_ireduce_scatter.c \
-	pnbc_osc_ireduce_scatter_block.c \
-	pnbc_osc_iscan.c \
-	pnbc_osc_iscatter.c \
-	pnbc_osc_iscatterv.c \
-	pnbc_osc_neighbor_helpers.c
+	pnbc_osc_iallreduce.c 
 
 # Make the output library in this directory, and name it either
 # mca_<type>_<name>.la (for DSO builds) or libmca_<type>_<name>.la
