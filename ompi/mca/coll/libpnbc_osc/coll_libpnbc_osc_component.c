@@ -401,7 +401,7 @@ libpnbc_osc_comm_query(struct ompi_communicator_t *comm,
 
     module->super.ft_event = NULL;
 
-    if (OMPI_SUCCESS != NBC_Init_comm(comm, module)) {
+    if (OMPI_SUCCESS != PNBC_OSC_Init_comm(comm, module)) {
         OBJ_RELEASE(module);
         return NULL;
     }
@@ -443,15 +443,15 @@ ompi_coll_libpnbc_osc_progress(void)
         OPAL_LIST_FOREACH_SAFE(request, next, &mca_coll_libpnbc_osc_component.active_requests,
                                ompi_coll_libpnbc_osc_request_t) {
             OPAL_THREAD_UNLOCK(&mca_coll_libpnbc_osc_component.lock);
-            res = NBC_Progress(request);
-            if( NBC_CONTINUE != res ) {
+            res = PNBC_OSC_Progress(request);
+            if( PNBC_OSC_CONTINUE != res ) {
                 /* done, remove and complete */
                 OPAL_THREAD_LOCK(&mca_coll_libpnbc_osc_component.lock);
                 opal_list_remove_item(&mca_coll_libpnbc_osc_component.active_requests,
                                       &request->super.super.super);
                 OPAL_THREAD_UNLOCK(&mca_coll_libpnbc_osc_component.lock);
 
-                if( OMPI_SUCCESS == res || NBC_OK == res || NBC_SUCCESS == res ) {
+                if( OMPI_SUCCESS == res || PNBC_OSC_OK == res || PNBC_OSC_SUCCESS == res ) {
                     request->super.req_status.MPI_ERROR = OMPI_SUCCESS;
                 }
                 else {
@@ -511,33 +511,33 @@ request_start(size_t count, ompi_request_t ** requests)
     int res;
     size_t i;
 
-    NBC_DEBUG(5, " ** request_start **\n");
+    PNBC_OSC_DEBUG(5, " ** request_start **\n");
 
     for (i = 0; i < count; i++) {
-        NBC_Handle *handle = (NBC_Handle *) requests[i];
-        NBC_Schedule *schedule = handle->schedule;
+        PNBC_OSC_Handle *handle = (PNBC_OSC_Handle *) requests[i];
+        PNBC_OSC_Schedule *schedule = handle->schedule;
 
-        NBC_DEBUG(5, "--------------------------------\n");
-        NBC_DEBUG(5, "schedule %p size %u\n", &schedule, sizeof(schedule));
-        NBC_DEBUG(5, "handle %p size %u\n", &handle, sizeof(handle));
-        NBC_DEBUG(5, "data %p size %u\n", &schedule->data, sizeof(schedule->data));
-        NBC_DEBUG(5, "req_array %p size %u\n", &handle->req_array, sizeof(handle->req_array));
-        NBC_DEBUG(5, "row_offset=%u address=%p size=%u\n", handle->row_offset, &handle->row_offset, sizeof(handle->row_offset));
-        NBC_DEBUG(5, "req_count=%u address=%p size=%u\n", handle->req_count, &handle->req_count, sizeof(handle->req_count));
-        NBC_DEBUG(5, "tmpbuf address=%p size=%u\n", handle->tmpbuf, sizeof(handle->tmpbuf));
-        NBC_DEBUG(5, "--------------------------------\n");
+        PNBC_OSC_DEBUG(5, "--------------------------------\n");
+        PNBC_OSC_DEBUG(5, "schedule %p size %u\n", &schedule, sizeof(schedule));
+        PNBC_OSC_DEBUG(5, "handle %p size %u\n", &handle, sizeof(handle));
+        PNBC_OSC_DEBUG(5, "data %p size %u\n", &schedule->data, sizeof(schedule->data));
+        PNBC_OSC_DEBUG(5, "req_array %p size %u\n", &handle->req_array, sizeof(handle->req_array));
+        PNBC_OSC_DEBUG(5, "row_offset=%u address=%p size=%u\n", handle->row_offset, &handle->row_offset, sizeof(handle->row_offset));
+        PNBC_OSC_DEBUG(5, "req_count=%u address=%p size=%u\n", handle->req_count, &handle->req_count, sizeof(handle->req_count));
+        PNBC_OSC_DEBUG(5, "tmpbuf address=%p size=%u\n", handle->tmpbuf, sizeof(handle->tmpbuf));
+        PNBC_OSC_DEBUG(5, "--------------------------------\n");
 
         handle->super.req_complete = REQUEST_PENDING;
         handle->nbc_complete = false;
 
-        res = NBC_Start(handle);
+        res = PNBC_OSC_Start(handle);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-            NBC_DEBUG(5, " ** bad result from NBC_Start **\n");
+            PNBC_OSC_DEBUG(5, " ** bad result from PNBC_OSC_Start **\n");
             return res;
         }
     }
 
-    NBC_DEBUG(5, " ** LEAVING request_start **\n");
+    PNBC_OSC_DEBUG(5, " ** LEAVING request_start **\n");
 
     return OMPI_SUCCESS;
 
@@ -561,7 +561,7 @@ request_free(struct ompi_request_t **ompi_req)
         return MPI_ERR_REQUEST;
     }
 
-    OMPI_COLL_LIBNBC_REQUEST_RETURN(request);
+    OMPI_COLL_LIBPNBC_OSC_REQUEST_RETURN(request);
     *ompi_req = MPI_REQUEST_NULL;
 
     return OMPI_SUCCESS;

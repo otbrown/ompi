@@ -26,76 +26,65 @@
 
 #include <assert.h>
 
-static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype datatype, ptrdiff_t gap, const void *sendbuf,
-                                    void *recvbuf, MPI_Op op, char inplace, NBC_Schedule *schedule, void *tmpbuf);
-static inline int allred_sched_ring(int rank, int p, int count, MPI_Datatype datatype, const void *sendbuf,
-                                    void *recvbuf, MPI_Op op, int size, int ext, NBC_Schedule *schedule,
-                                    void *tmpbuf);
-static inline int allred_sched_linear(int rank, int p, const void *sendbuf, void *recvbuf, int count,
-                                      MPI_Datatype datatype, ptrdiff_t gap, MPI_Op op, int ext, int size,
-                                      NBC_Schedule *schedule, void *tmpbuf);
-static inline int allred_sched_redscat_allgather(
-    int rank, int comm_size, int count, MPI_Datatype datatype, ptrdiff_t gap,
-    const void *sbuf, void *rbuf, MPI_Op op, char inplace,
-    NBC_Schedule *schedule, void *tmpbuf, struct ompi_communicator_t *comm);
+static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype datatype, ptrdiff_t gap,
+                                    const void *sendbuf, void *recvbuf, MPI_Op op, char inplace,
+                                    PNBC_OSC_Schedule *schedule, void *tmpbuf);
+static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype datatype, ptrdiff_t gap,
+                                        void *sendbuf, void *recvbuf, MPI_Op op, char inplace,
+                                        PNBC_OSC_Schedule *schedule, void *tmpbuf, ompi_request_t ** request);
+static inline int allred_sched_ring(int rank, int p, int count, MPI_Datatype datatype,
+                                    const void *sendbuf, void *recvbuf, MPI_Op op, int size,
+                                    int ext, PNBC_OSC_Schedule *schedule, void *tmpbuf);
+static inline int allred_sched_linear(int rank, int p, const void *sendbuf, void *recvbuf,
+                                      int count, MPI_Datatype datatype, ptrdiff_t gap, MPI_Op op,
+                                      int ext, int size, PNBC_OSC_Schedule *schedule, void *tmpbuf);
+static inline int allred_sched_redscat_allgather(int rank, int comm_size, int count,
+                                                 MPI_Datatype datatype, ptrdiff_t gap,
+                                                 const void *sbuf, void *rbuf, MPI_Op op,
+                                                 char inplace, PNBC_OSC_Schedule *schedule,
+                                                 void *tmpbuf, struct ompi_communicator_t *comm);
 
-#ifdef NBC_CACHE_SCHEDULE
-/* tree comparison function for schedule cache */
-int NBC_Allreduce_args_compare(NBC_Allreduce_args *a, NBC_Allreduce_args *b, void *param) {
-  if ((a->sendbuf == b->sendbuf) &&
-      (a->recvbuf == b->recvbuf) &&
-      (a->count == b->count) &&
-      (a->datatype == b->datatype) &&
-      (a->op == b->op)) {
-    return 0;
-  }
 
-  if( a->sendbuf < b->sendbuf ) {
-    return -1;
-  }
-
-  return 1;
-}
-#endif
-
-static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
-                              struct ompi_communicator_t *comm, ompi_request_t ** request,
+static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+                              MPI_Op op, struct ompi_communicator_t *comm, ompi_request_t ** request,
                               struct mca_coll_base_module_2_3_0_t *module, bool persistent)
 {
   int rank, p, res;
   ptrdiff_t ext, lb;
-  NBC_Schedule *schedule;
+  PNBC_OSC_Schedule *schedule;
   size_t size;
-#ifdef NBC_CACHE_SCHEDULE
-  NBC_Allreduce_args *args, *found, search;
-#endif
-  enum { NBC_ARED_BINOMIAL, NBC_ARED_RING, NBC_ARED_REDSCAT_ALLGATHER } alg;
+  ompi_win_t *win;
+  struct ompi_info_t * info = &ompi_mpi_info_null.info;
+  enum { PNBC_OSC_ARED_BINOMIAL, PNBC_OSC_ARED_RING, PNBC_OSC_ARED_REDSCAT_ALLGATHER, PNBC_OSC_ARED_BINOMIAL_RMA } alg;
   char inplace;
   void *tmpbuf = NULL;
+  void *tmpsbuf = NULL;
   ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
   ptrdiff_t span, gap;
-
-  NBC_IN_PLACE(sendbuf, recvbuf, inplace);
+  MPI_Aint disp, *disp_a;
+  int rma = 1;
+  
+  PNBC_OSC_IN_PLACE(sendbuf, recvbuf, inplace);
 
   rank = ompi_comm_rank (comm);
   p = ompi_comm_size (comm);
 
   res = ompi_datatype_get_extent(datatype, &lb, &ext);
   if (OMPI_SUCCESS != res) {
-    NBC_Error ("MPI Error in ompi_datatype_type_extent() (%i)", res);
+    PNBC_OSC_Error ("MPI Error in ompi_datatype_type_extent() (%i)", res);
     return res;
   }
 
   res = ompi_datatype_type_size (datatype, &size);
   if (OMPI_SUCCESS != res) {
-    NBC_Error ("MPI Error in ompi_datatype_type_size() (%i)", res);
+    PNBC_OSC_Error ("MPI Error in ompi_datatype_type_size() (%i)", res);
     return res;
   }
 
   if (1 == p && (!persistent || inplace)) {
     if (!inplace) {
       /* for a single node - copy data to receivebuf */
-      res = NBC_Copy(sendbuf, count, datatype, recvbuf, count, datatype, comm);
+      res = PNBC_OSC_Copy(sendbuf, count, datatype, recvbuf, count, datatype, comm);
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         return res;
       }
@@ -108,141 +97,144 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   if (OPAL_UNLIKELY(NULL == tmpbuf)) {
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
+  
+  /* make a copy of the send buffer - we now have a writable send buffer */
+  tmpsbuf = malloc(size*count);
+  memcpy(tmpsbuf, sendbuf, size*count);
+
+  /* create an MPI dynamic Window */
+  res = ompi_win_create_dynamic(&info->super, comm, &win);
+  if (OMPI_SUCCESS != res) {
+    PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
+    free(tmpbuf);
+    free(tmpsbuf);
+    return res;
+  }
+  
+  /* Attach window to sendbuf */
+  res = win->w_osc_module->osc_win_attach(win, tmpsbuf, count*size);
+  PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] Attach MPI Window dynamic - OK \n");
+  
+  /* MPI Get_address  */
+  MPI_Get_address (sendbuf, &disp);
+
+  /* create an array of displacements */
+  disp_a = (MPI_Aint*)malloc(count * sizeof(MPI_Aint));
+
+  /* Gather ALL displacements-> pt2pt call */
+
+  res = comm->c_coll->coll_allgather(&disp, 1, MPI_INT, disp_a, count, MPI_INT, comm,
+                                     comm->c_coll->coll_allgather_module);
+  if (OMPI_SUCCESS != res) {
+    PNBC_OSC_Error ("MPI Error in coll_allgather (%i)", res);
+    return res;
+  }
 
   /* algorithm selection */
   int nprocs_pof2 = opal_next_poweroftwo(p) >> 1;
   if (libpnbc_osc_iallreduce_algorithm == 0) {
-    if(p < 4 || size*count < 65536 || !ompi_op_is_commute(op) || inplace) {
-      alg = NBC_ARED_BINOMIAL;
-    } else if (count >= nprocs_pof2 && ompi_op_is_commute(op)) {
-      alg = NBC_ARED_REDSCAT_ALLGATHER;
+    if(rma){
+      alg = PNBC_OSC_ARED_BINOMIAL_RMA;
+    } else if(p < 4 || size*count < 65536 || !ompi_op_is_commute(op) || inplace) {
+      alg = PNBC_OSC_ARED_BINOMIAL;
+    } else if(count >= nprocs_pof2 && ompi_op_is_commute(op)) {
+      alg = PNBC_OSC_ARED_REDSCAT_ALLGATHER;
     } else {
-      alg = NBC_ARED_RING;
+      alg = PNBC_OSC_ARED_RING;
     }
   } else {
     if (libpnbc_osc_iallreduce_algorithm == 1)
-      alg = NBC_ARED_RING;
+      alg = PNBC_OSC_ARED_RING;
     else if (libpnbc_osc_iallreduce_algorithm == 2)
-      alg = NBC_ARED_BINOMIAL;
-    else if (libpnbc_osc_iallreduce_algorithm == 3 && count >= nprocs_pof2 && ompi_op_is_commute(op)) {
-      alg = NBC_ARED_REDSCAT_ALLGATHER;
+      alg = PNBC_OSC_ARED_BINOMIAL;
+    else if (libpnbc_osc_iallreduce_algorithm == 3 &&
+             count >= nprocs_pof2 && ompi_op_is_commute(op)) {
+      alg = PNBC_OSC_ARED_REDSCAT_ALLGATHER;
     } else
-      alg = NBC_ARED_RING;
+      alg = PNBC_OSC_ARED_RING;
   }
-#ifdef NBC_CACHE_SCHEDULE
-  /* search schedule in communicator specific tree */
-  search.sendbuf = sendbuf;
-  search.recvbuf = recvbuf;
-  search.count = count;
-  search.datatype = datatype;
-  search.op = op;
-  found = (NBC_Allreduce_args *) hb_tree_search ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_ALLREDUCE], &search);
-  if (NULL == found) {
-#endif
-    schedule = OBJ_NEW(NBC_Schedule);
-    if (NULL == schedule) {
-      free(tmpbuf);
-      return OMPI_ERR_OUT_OF_RESOURCE;
-    }
+  schedule = OBJ_NEW(PNBC_OSC_Schedule);
+  if (NULL == schedule) {
+    free(tmpbuf);
+    return OMPI_ERR_OUT_OF_RESOURCE;
+  }
 
-    if (p == 1) {
-      res = NBC_Sched_copy((void *)sendbuf, false, count, datatype,
-                           recvbuf, false, count, datatype, schedule, false);
-    } else {
-      switch(alg) {
-        case NBC_ARED_BINOMIAL:
-          res = allred_sched_diss(rank, p, count, datatype, gap, sendbuf, recvbuf, op, inplace, schedule, tmpbuf);
-          break;
-        case NBC_ARED_REDSCAT_ALLGATHER:
-          res = allred_sched_redscat_allgather(rank, p, count, datatype, gap, sendbuf, recvbuf, op, inplace, schedule, tmpbuf, comm);
-          break;
-        case NBC_ARED_RING:
-          res = allred_sched_ring(rank, p, count, datatype, sendbuf, recvbuf, op, size, ext, schedule, tmpbuf);
-          break;
-      }
-    }
-
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-      OBJ_RELEASE(schedule);
-      free(tmpbuf);
-      return res;
-    }
-
-    res = NBC_Sched_commit(schedule);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-      OBJ_RELEASE(schedule);
-      free(tmpbuf);
-      return res;
-    }
-
-#ifdef NBC_CACHE_SCHEDULE
-    /* save schedule to tree */
-    args = (NBC_Allreduce_args *) malloc (sizeof(args));
-    if (NULL != args) {
-      args->sendbuf = sendbuf;
-      args->recvbuf = recvbuf;
-      args->count = count;
-      args->datatype = datatype;
-      args->op = op;
-      args->schedule = schedule;
-      res = hb_tree_insert ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_ALLREDUCE], args, args, 0);
-      if (0 == res) {
-        OBJ_RETAIN(schedule);
-
-        /* increase number of elements for A2A */
-        if (++libpnbc_osc_module->NBC_Dict_size[NBC_ALLREDUCE] > NBC_SCHED_DICT_UPPER) {
-          NBC_SchedCache_dictwipe ((hb_tree *) libpnbc_osc_module->NBC_Dict[NBC_ALLREDUCE],
-                                   &libpnbc_osc_module->NBC_Dict_size[NBC_ALLREDUCE]);
-        }
-      } else {
-        NBC_Error("error in dict_insert() (%i)", res);
-        free (args);
-      }
-    }
+  if (p == 1) {
+    res = PNBC_OSC_Sched_copy((void *)sendbuf, false, count, datatype,
+                         recvbuf, false, count, datatype, schedule, false);
   } else {
-    /* found schedule */
-    schedule = found->schedule;
-    OBJ_RETAIN(schedule);
+    switch(alg) {
+    case PNBC_OSC_ARED_BINOMIAL:
+      res = allred_sched_diss(rank, p, count, datatype, gap, sendbuf, recvbuf, op, inplace,
+                              schedule, tmpbuf);
+      break;
+    case PNBC_OSC_ARED_BINOMIAL_RMA:
+      res = allred_sched_diss_rma(rank, p, count, datatype, gap, tmpsbuf, recvbuf, op, inplace,
+                                  schedule, tmpbuf, request);
+      break;
+    case PNBC_OSC_ARED_REDSCAT_ALLGATHER:
+      res = allred_sched_redscat_allgather(rank, p, count, datatype, gap, sendbuf, recvbuf,
+                                           op, inplace, schedule, tmpbuf, comm);
+      break;
+    case PNBC_OSC_ARED_RING:
+      res = allred_sched_ring(rank, p, count, datatype, sendbuf, recvbuf, op, size, ext,
+                              schedule, tmpbuf);
+      break;
+    }
   }
-#endif
 
-  res = NBC_Schedule_request (schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
     return res;
   }
 
+  res = PNBC_OSC_Sched_commit(schedule);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    OBJ_RELEASE(schedule);
+    free(tmpbuf);
+    return res;
+  }
+
+res = PNBC_OSC_Schedule_request (schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
+if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+  OBJ_RELEASE(schedule);
+  free(tmpbuf);
+  return res;
+ }
+
+return OMPI_SUCCESS;
+}
+
+int ompi_coll_libpnbc_osc_iallreduce(const void* sendbuf, void* recvbuf, int count,
+                                     MPI_Datatype datatype, MPI_Op op,
+                                     struct ompi_communicator_t *comm, ompi_request_t ** request,
+                                     struct mca_coll_base_module_2_3_0_t *module) {
+  int res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op, comm, request,
+                               module, false);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    return res;
+  }
+
+  res = PNBC_OSC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    PNBC_OSC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
+    *request = &ompi_request_null.request;
+    return res;
+  }
+
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libpnbc_osc_iallreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
-                                struct ompi_communicator_t *comm, ompi_request_t ** request,
-                                struct mca_coll_base_module_2_3_0_t *module) {
-    int res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op,
-                                 comm, request, module, false);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        return res;
-    }
-  
-    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
-        *request = &ompi_request_null.request;
-        return res;
-    }
-
-    return OMPI_SUCCESS;
-}
-
-static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count,
+                                    MPI_Datatype datatype, MPI_Op op,
                                     struct ompi_communicator_t *comm, ompi_request_t ** request,
                                     struct mca_coll_base_module_2_3_0_t *module, bool persistent)
 {
   int rank, res, rsize;
   size_t size;
   MPI_Aint ext;
-  NBC_Schedule *schedule;
+  PNBC_OSC_Schedule *schedule;
   void *tmpbuf = NULL;
   ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
   ptrdiff_t span, gap;
@@ -252,13 +244,13 @@ static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int coun
 
   res = ompi_datatype_type_extent(datatype, &ext);
   if (MPI_SUCCESS != res) {
-    NBC_Error("MPI Error in ompi_datatype_type_extent() (%i)", res);
+    PNBC_OSC_Error("MPI Error in ompi_datatype_type_extent() (%i)", res);
     return res;
   }
 
   res = ompi_datatype_type_size(datatype, &size);
   if (MPI_SUCCESS != res) {
-    NBC_Error("MPI Error in ompi_datatype_type_size() (%i)", res);
+    PNBC_OSC_Error("MPI Error in ompi_datatype_type_size() (%i)", res);
     return res;
   }
 
@@ -268,7 +260,7 @@ static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int coun
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
 
-  schedule = OBJ_NEW(NBC_Schedule);
+  schedule = OBJ_NEW(PNBC_OSC_Schedule);
   if (OPAL_UNLIKELY(NULL == schedule)) {
     free(tmpbuf);
     return OMPI_ERR_OUT_OF_RESOURCE;
@@ -282,14 +274,14 @@ static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int coun
     return res;
   }
 
-  res = NBC_Sched_commit(schedule);
+  res = PNBC_OSC_Sched_commit(schedule);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
     return res;
   }
 
-  res = NBC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
+  res = PNBC_OSC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
@@ -299,23 +291,25 @@ static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int coun
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libpnbc_osc_iallreduce_inter(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
-                                      struct ompi_communicator_t *comm, ompi_request_t ** request,
-                                      struct mca_coll_base_module_2_3_0_t *module) {
-    int res = nbc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
-                                       comm, request, module, false);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        return res;
-    }
-  
-    res = NBC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        NBC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
-        *request = &ompi_request_null.request;
-        return res;
-    }
+int ompi_coll_libpnbc_osc_iallreduce_inter(const void* sendbuf, void* recvbuf, int count,
+                                           MPI_Datatype datatype, MPI_Op op,
+                                           struct ompi_communicator_t *comm,
+                                           ompi_request_t ** request,
+                                           struct mca_coll_base_module_2_3_0_t *module) {
+  int res = nbc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
+                                     comm, request, module, false);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    return res;
+  }
 
-    return OMPI_SUCCESS;
+  res = PNBC_OSC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    PNBC_OSC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
+    *request = &ompi_request_null.request;
+    return res;
+  }
+
+  return OMPI_SUCCESS;
 }
 
 /* binomial allreduce (binomial tree up and binomial bcast down)
@@ -341,20 +335,93 @@ int ompi_coll_libpnbc_osc_iallreduce_inter(const void* sendbuf, void* recvbuf, i
  * - a node stops to send if 2^r > commsize
  *
  */
-#define RANK2VRANK(rank, vrank, root) \
-{ \
-  vrank = rank; \
-  if (rank == 0) vrank = root; \
-  if (rank == root) vrank = 0; \
+#define RANK2VRANK(rank, vrank, root)           \
+  {                                             \
+    vrank = rank;                               \
+    if (rank == 0) vrank = root;                \
+    if (rank == root) vrank = 0;                \
+  }
+#define VRANK2RANK(rank, vrank, root)           \
+  {                                             \
+    rank = vrank;                               \
+    if (vrank == 0) rank = root;                \
+    if (vrank == root) rank = 0;                \
+  }
+static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype datatype,
+                                        ptrdiff_t gap, void *sendbuf, void *recvbuf,
+                                        MPI_Op op, char inplace, PNBC_OSC_Schedule *schedule,
+                                        void *tmpbuf, ompi_request_t **request) {
+  int root, vrank, maxr, vpeer, peer, res;
+
+  int assert = 0;
+  int lock_type = MPI_LOCK_SHARED;
+  root = 0; /* this makes the code for ireduce and iallreduce nearly identical 
+               - could be changed to improve performance */
+  RANK2VRANK(rank, vrank, root);
+  maxr = (int)ceil((log((double)p)/LOG2));
+
+  
+  for (int r = 1; r <= maxr ; ++r) {
+    if ((vrank % (1 << r)) == 0) {
+      /* we have to receive this round */
+      vpeer = vrank + (1 << (r - 1));
+      VRANK2RANK(peer, vpeer, root);
+      if (peer < p) {
+        /* get the data from my peer and store it in recvbuf*/
+        res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype,
+                                 schedule, lock_type, assert, true);
+        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+          return res;
+        }
+        res = PNBC_OSC_Sched_barrier (schedule);
+        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+          return res;
+        }
+        /* add value to my values in my window - i.e. add the values and store them in sendbuf
+           so they can be use in the next r iteration */
+        res = PNBC_OSC_Sched_op (recvbuf, false, sendbuf, false, count, datatype, op, schedule, true);
+        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+          return res;
+        }
+      }
+    }
+  }
+  
+  /* this is the Bcast part */
+  RANK2VRANK(rank, vrank, root);
+  
+  /* receive from the right hosts  */
+  if (vrank != 0) {
+    for (int r = 0; r < maxr ; ++r) {
+      if ((vrank >= (1 << r)) && (vrank < (1 << (r + 1)))) {
+        VRANK2RANK(peer, vrank - (1 << r), root);
+        /* try_get and place in recvbuf*/
+        res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype,
+                                 schedule, lock_type, assert, true);
+        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+          return res;
+        }
+        
+      }
+    }
+  }
+  
+  /* root copies buffer to recvbuf */
+  if (0 == vrank){
+    res = PNBC_OSC_Sched_copy(sendbuf, false, count, datatype, recvbuf, false, count, datatype,
+                         schedule, false);
+    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+      return res;
+    }
+    
+  }
+  
+  /* end of the bcast */
+  return OMPI_SUCCESS;
 }
-#define VRANK2RANK(rank, vrank, root) \
-{ \
-  rank = vrank; \
-  if (vrank == 0) rank = root; \
-  if (vrank == root) rank = 0; \
-}
+
 static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype datatype, ptrdiff_t gap, const void *sendbuf, void *recvbuf,
-                                    MPI_Op op, char inplace, NBC_Schedule *schedule, void *tmpbuf) {
+                                    MPI_Op op, char inplace, PNBC_OSC_Schedule *schedule, void *tmpbuf) {
   int root, vrank, maxr, vpeer, peer, res;
   char *rbuf, *lbuf, *buf;
   int tmprbuf, tmplbuf;
@@ -374,12 +441,12 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
     rbuf = recvbuf;
     tmprbuf = false;
     if (inplace) {
-        res = NBC_Sched_copy(rbuf, false, count, datatype,
-                             ((char *)tmpbuf) - gap, false, count, datatype,
-                             schedule, true);
-        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-          return res;
-        }
+      res = PNBC_OSC_Sched_copy(rbuf, false, count, datatype,
+                           ((char *)tmpbuf) - gap, false, count, datatype,
+                           schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+        return res;
+      }
     }
   }
 
@@ -388,40 +455,40 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
       /* we have to receive this round */
       vpeer = vrank + (1 << (r - 1));
       VRANK2RANK(peer, vpeer, root)
-      if (peer < p) {
-        /* we have to wait until we have the data */
-        res = NBC_Sched_recv (rbuf, tmprbuf, count, datatype, peer, schedule, true);
-        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-          return res;
-        }
+        if (peer < p) {
+          /* we have to wait until we have the data */
+          res = PNBC_OSC_Sched_recv (rbuf, tmprbuf, count, datatype, peer, schedule, true);
+          if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+            return res;
+          }
 
-        /* this cannot be done until tmpbuf is unused :-( so barrier after the op */
-        if (firstred && !inplace) {
-          /* perform the reduce with the senbuf */
-          res = NBC_Sched_op (sendbuf, false, rbuf, tmprbuf, count, datatype, op, schedule, true);
-          firstred = 0;
-        } else {
-          /* perform the reduce in my local buffer */
-          res = NBC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op, schedule, true);
+          /* this cannot be done until tmpbuf is unused :-( so barrier after the op */
+          if (firstred && !inplace) {
+            /* perform the reduce with the senbuf */
+            res = PNBC_OSC_Sched_op (sendbuf, false, rbuf, tmprbuf, count, datatype, op, schedule, true);
+            firstred = 0;
+          } else {
+            /* perform the reduce in my local buffer */
+            res = PNBC_OSC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op, schedule, true);
+          }
+          if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+            return res;
+          }
+          /* swap left and right buffers */
+          buf = rbuf; rbuf = lbuf ; lbuf = buf;
+          tmprbuf ^= 1; tmplbuf ^= 1;
         }
-        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-          return res;
-        }
-        /* swap left and right buffers */
-        buf = rbuf; rbuf = lbuf ; lbuf = buf;
-        tmprbuf ^= 1; tmplbuf ^= 1;
-      }
     } else {
       /* we have to send this round */
       vpeer = vrank - (1 << (r - 1));
       VRANK2RANK(peer, vpeer, root)
-      if (firstred && !inplace) {
-        /* we have to use the sendbuf in the first round .. */
-        res = NBC_Sched_send (sendbuf, false, count, datatype, peer, schedule, false);
-      } else {
-        /* and the recvbuf in all remaining rounds */
-        res = NBC_Sched_send (lbuf, tmplbuf, count, datatype, peer, schedule, false);
-      }
+        if (firstred && !inplace) {
+          /* we have to use the sendbuf in the first round .. */
+          res = PNBC_OSC_Sched_send (sendbuf, false, count, datatype, peer, schedule, false);
+        } else {
+          /* and the recvbuf in all remaining rounds */
+          res = PNBC_OSC_Sched_send (lbuf, tmplbuf, count, datatype, peer, schedule, false);
+        }
 
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         return res;
@@ -441,14 +508,14 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
     for (int r = 0; r < maxr ; ++r) {
       if ((vrank >= (1 << r)) && (vrank < (1 << (r + 1)))) {
         VRANK2RANK(peer, vrank - (1 << r), root);
-        res = NBC_Sched_recv (recvbuf, false, count, datatype, peer, schedule, false);
+        res = PNBC_OSC_Sched_recv (recvbuf, false, count, datatype, peer, schedule, false);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
       }
     }
 
-    res = NBC_Sched_barrier (schedule);
+    res = PNBC_OSC_Sched_barrier (schedule);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       return res;
     }
@@ -459,7 +526,7 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
   for (int r = 0; r < maxr; ++r) {
     if (((vrank + (1 << r) < p) && (vrank < (1 << r))) || (vrank == 0)) {
       VRANK2RANK(peer, vrank + (1 << r), root);
-      res = NBC_Sched_send (recvbuf, false, count, datatype, peer, schedule, false);
+      res = PNBC_OSC_Sched_send (recvbuf, false, count, datatype, peer, schedule, false);
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         return res;
       }
@@ -471,7 +538,7 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
 }
 
 static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datatype, const void *sendbuf, void *recvbuf, MPI_Op op,
-                                     int size, int ext, NBC_Schedule *schedule, void *tmpbuf) {
+                                     int size, int ext, PNBC_OSC_Schedule *schedule, void *tmpbuf) {
   int segsize, *segsizes, *segoffsets; /* segment sizes and offsets per segment (number of segments == number of nodes */
   int speer, rpeer; /* send and recvpeer */
   int res = OMPI_SUCCESS;
@@ -615,10 +682,10 @@ static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datat
 
     /* first message come out of sendbuf */
     if (round == 0) {
-      res = NBC_Sched_send ((char *) sendbuf + soffset, false, segsizes[selement], datatype, speer,
+      res = PNBC_OSC_Sched_send ((char *) sendbuf + soffset, false, segsizes[selement], datatype, speer,
                             schedule, false);
     } else {
-      res = NBC_Sched_send ((char *) recvbuf + soffset, false, segsizes[selement], datatype, speer,
+      res = PNBC_OSC_Sched_send ((char *) recvbuf + soffset, false, segsizes[selement], datatype, speer,
                             schedule, false);
     }
 
@@ -626,14 +693,14 @@ static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datat
       break;
     }
 
-    res = NBC_Sched_recv ((char *) recvbuf + roffset, false, segsizes[relement], datatype, rpeer,
+    res = PNBC_OSC_Sched_recv ((char *) recvbuf + roffset, false, segsizes[relement], datatype, rpeer,
                           schedule, true);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       break;
     }
 
-    res = NBC_Sched_op ((char *) sendbuf + roffset, false, (char *) recvbuf + roffset, false,
-                         segsizes[relement], datatype, op, schedule, true);
+    res = PNBC_OSC_Sched_op ((char *) sendbuf + roffset, false, (char *) recvbuf + roffset, false,
+                        segsizes[relement], datatype, op, schedule, true);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       break;
     }
@@ -651,13 +718,13 @@ static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datat
     int relement = (r-round + 2*p /*2*p avoids negative mod*/)%p; /* the element that I receive from my neighbor */
     int roffset = segoffsets[relement]*ext;
 
-    res = NBC_Sched_send ((char *) recvbuf + soffset, false, segsizes[selement], datatype, speer,
+    res = PNBC_OSC_Sched_send ((char *) recvbuf + soffset, false, segsizes[selement], datatype, speer,
                           schedule, false);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       break;
     }
 
-    res = NBC_Sched_recv ((char *) recvbuf + roffset, false, segsizes[relement], datatype, rpeer,
+    res = PNBC_OSC_Sched_recv ((char *) recvbuf + roffset, false, segsizes[relement], datatype, rpeer,
                           schedule, true);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       break;
@@ -671,7 +738,7 @@ static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datat
 }
 
 static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
-				      ptrdiff_t gap, MPI_Op op, int ext, int size, NBC_Schedule *schedule, void *tmpbuf) {
+                                      ptrdiff_t gap, MPI_Op op, int ext, int size, PNBC_OSC_Schedule *schedule, void *tmpbuf) {
   int res;
 
   if (0 == count) {
@@ -679,16 +746,16 @@ static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, 
   }
 
   /* send my data to the remote root */
-  res = NBC_Sched_send (sendbuf, false, count, datatype, 0, schedule, false);
+  res = PNBC_OSC_Sched_send (sendbuf, false, count, datatype, 0, schedule, false);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     return res;
   }
 
   /* recv my data to the remote root */
   if (0 != rank || 1 ==(rsize%2)) {
-    res = NBC_Sched_recv (recvbuf, false, count, datatype, 0, schedule, false);
+    res = PNBC_OSC_Sched_recv (recvbuf, false, count, datatype, 0, schedule, false);
   } else {
-    res = NBC_Sched_recv ((void *)(-gap), true, count, datatype, 0, schedule, false);
+    res = PNBC_OSC_Sched_recv ((void *)(-gap), true, count, datatype, 0, schedule, false);
   }
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     return res;
@@ -698,7 +765,7 @@ static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, 
     char *rbuf, *lbuf, *buf;
     int tmprbuf, tmplbuf;
 
-    res = NBC_Sched_barrier (schedule);
+    res = PNBC_OSC_Sched_barrier (schedule);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       return res;
     }
@@ -718,12 +785,12 @@ static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, 
 
     /* get data from remote peers and reduce */
     for (int rpeer = 1 ; rpeer < rsize ; ++rpeer) {
-      res = NBC_Sched_recv (rbuf, tmprbuf, count, datatype, rpeer, schedule, true);
+      res = PNBC_OSC_Sched_recv (rbuf, tmprbuf, count, datatype, rpeer, schedule, true);
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         return res;
       }
 
-      res = NBC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op, schedule, true);
+      res = PNBC_OSC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op, schedule, true);
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         return res;
       }
@@ -733,20 +800,20 @@ static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, 
     }
 
     /* exchange our result with the remote root (each root will broadcast to the other's peers) */
-    res = NBC_Sched_recv ((void *)(-gap), true, count, datatype, 0, schedule, false);
+    res = PNBC_OSC_Sched_recv ((void *)(-gap), true, count, datatype, 0, schedule, false);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       return res;
     }
 
     /* wait for data from remote root */
-    res = NBC_Sched_send (recvbuf, false, count, datatype, 0, schedule, true);
+    res = PNBC_OSC_Sched_send (recvbuf, false, count, datatype, 0, schedule, true);
     if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
       return res;
     }
 
     /* broadcast the result to all remote peers */
     for (int rpeer = 1 ; rpeer < rsize ; ++rpeer) {
-      res = NBC_Sched_send ((void *)(-gap), true, count, datatype, rpeer, schedule, false);
+      res = PNBC_OSC_Sched_send ((void *)(-gap), true, count, datatype, rpeer, schedule, false);
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         return res;
       }
@@ -811,237 +878,238 @@ static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, 
  * Schedule length (rounds): O(\log(p))
  */
 static inline int allred_sched_redscat_allgather(
-    int rank, int comm_size, int count, MPI_Datatype datatype, ptrdiff_t gap,
-    const void *sbuf, void *rbuf, MPI_Op op, char inplace,
-    NBC_Schedule *schedule, void *tmpbuf, struct ompi_communicator_t *comm)
+                                                 int rank, int comm_size, int count, MPI_Datatype datatype, ptrdiff_t gap,
+                                                 const void *sbuf, void *rbuf, MPI_Op op, char inplace,
+                                                 PNBC_OSC_Schedule *schedule, void *tmpbuf, struct ompi_communicator_t *comm)
 {
-    int res = OMPI_SUCCESS;
-    int *rindex = NULL, *rcount = NULL, *sindex = NULL, *scount = NULL;
-     /* Find nearest power-of-two less than or equal to comm_size */
-    int nsteps = opal_hibit(comm_size, comm->c_cube_dim + 1);   /* ilog2(comm_size) */
-    int nprocs_pof2 = 1 << nsteps;                              /* flp2(comm_size) */
-     if (!inplace) {
-        res = NBC_Sched_copy((char *)sbuf, false, count, datatype,
-                             rbuf, false, count, datatype, schedule, true);
-        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+  int res = OMPI_SUCCESS;
+  int *rindex = NULL, *rcount = NULL, *sindex = NULL, *scount = NULL;
+  /* Find nearest power-of-two less than or equal to comm_size */
+  int nsteps = opal_hibit(comm_size, comm->c_cube_dim + 1);   /* ilog2(comm_size) */
+  int nprocs_pof2 = 1 << nsteps;                              /* flp2(comm_size) */
+  if (!inplace) {
+    res = PNBC_OSC_Sched_copy((char *)sbuf, false, count, datatype,
+                         rbuf, false, count, datatype, schedule, true);
+    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+  }
+  char *tmp_buf = (char *)tmpbuf - gap;
+  ptrdiff_t lb, extent;
+  ompi_datatype_get_extent(datatype, &lb, &extent);
+  /*
+   * Step 1. Reduce the number of processes to the nearest lower power of two
+   * p' = 2^{\floor{\log_2 p}} by removing r = p - p' processes.
+   * 1. In the first 2r processes (ranks 0 to 2r - 1), all the even ranks send
+   *    the second half of the input vector to their right neighbor (rank + 1)
+   *    and all the odd ranks send the first half of the input vector to their
+   *    left neighbor (rank - 1).
+   * 2. All 2r processes compute the reduction on their half.
+   * 3. The odd ranks then send the result to their left neighbors
+   *    (the even ranks).
+   *
+   * The even ranks (0 to 2r - 1) now contain the reduction with the input
+   * vector on their right neighbors (the odd ranks). The first r even
+   * processes and the p - 2r last processes are renumbered from
+   * 0 to 2^{\floor{\log_2 p}} - 1.
+   */
+  int vrank, step, wsize;
+  int nprocs_rem = comm_size - nprocs_pof2;
+  if (rank < 2 * nprocs_rem) {
+    int count_lhalf = count / 2;
+    int count_rhalf = count - count_lhalf;
+    if (rank % 2 != 0) {
+      /*
+       * Odd process -- exchange with rank - 1
+       * Send the left half of the input vector to the left neighbor,
+       * Recv the right half of the input vector from the left neighbor
+       */
+      res = PNBC_OSC_Sched_send(rbuf, false, count_lhalf, datatype, rank - 1,
+                           schedule, false);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      res = PNBC_OSC_Sched_recv(tmp_buf + (ptrdiff_t)count_lhalf * extent,
+                           false, count_rhalf, datatype, rank - 1, schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      res = PNBC_OSC_Sched_op(tmp_buf + (ptrdiff_t)count_lhalf * extent,
+                         false, (char *)rbuf + (ptrdiff_t)count_lhalf * extent,
+                         false, count_rhalf, datatype, op, schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      /* Send the right half to the left neighbor */
+      res = PNBC_OSC_Sched_send((char *)rbuf + (ptrdiff_t)count_lhalf * extent,
+                           false, count_rhalf, datatype, rank - 1, schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      /* This process does not participate in recursive doubling phase */
+      vrank = -1;
+    } else {
+      /*
+       * Even process -- exchange with rank + 1
+       * Send the right half of the input vector to the right neighbor,
+       * Recv the left half of the input vector from the right neighbor
+       */
+      res = PNBC_OSC_Sched_send((char *)rbuf + (ptrdiff_t)count_lhalf * extent,
+                           false, count_rhalf, datatype, rank + 1, schedule, false);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      res = PNBC_OSC_Sched_recv(tmp_buf, false, count_lhalf, datatype, rank + 1,
+                           schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      res = PNBC_OSC_Sched_op(tmp_buf, false, rbuf, false, count_lhalf,
+                         datatype, op, schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      /* Recv the right half from the right neighbor */
+      res = PNBC_OSC_Sched_recv((char *)rbuf + (ptrdiff_t)count_lhalf * extent,
+                           false, count_rhalf, datatype, rank + 1, schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      vrank = rank / 2;
     }
-    char *tmp_buf = (char *)tmpbuf - gap;
-    ptrdiff_t lb, extent;
-    ompi_datatype_get_extent(datatype, &lb, &extent);
-     /*
-     * Step 1. Reduce the number of processes to the nearest lower power of two
-     * p' = 2^{\floor{\log_2 p}} by removing r = p - p' processes.
-     * 1. In the first 2r processes (ranks 0 to 2r - 1), all the even ranks send
-     *    the second half of the input vector to their right neighbor (rank + 1)
-     *    and all the odd ranks send the first half of the input vector to their
-     *    left neighbor (rank - 1).
-     * 2. All 2r processes compute the reduction on their half.
-     * 3. The odd ranks then send the result to their left neighbors
-     *    (the even ranks).
-     *
-     * The even ranks (0 to 2r - 1) now contain the reduction with the input
-     * vector on their right neighbors (the odd ranks). The first r even
-     * processes and the p - 2r last processes are renumbered from
-     * 0 to 2^{\floor{\log_2 p}} - 1.
-     */
-    int vrank, step, wsize;
-    int nprocs_rem = comm_size - nprocs_pof2;
-     if (rank < 2 * nprocs_rem) {
-        int count_lhalf = count / 2;
-        int count_rhalf = count - count_lhalf;
-         if (rank % 2 != 0) {
-            /*
-             * Odd process -- exchange with rank - 1
-             * Send the left half of the input vector to the left neighbor,
-             * Recv the right half of the input vector from the left neighbor
-             */
-            res = NBC_Sched_send(rbuf, false, count_lhalf, datatype, rank - 1,
-                                 schedule, false);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             res = NBC_Sched_recv(tmp_buf + (ptrdiff_t)count_lhalf * extent,
-                                 false, count_rhalf, datatype, rank - 1, schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             res = NBC_Sched_op(tmp_buf + (ptrdiff_t)count_lhalf * extent,
-                               false, (char *)rbuf + (ptrdiff_t)count_lhalf * extent,
-                               false, count_rhalf, datatype, op, schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             /* Send the right half to the left neighbor */
-            res = NBC_Sched_send((char *)rbuf + (ptrdiff_t)count_lhalf * extent,
-                                 false, count_rhalf, datatype, rank - 1, schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             /* This process does not participate in recursive doubling phase */
-            vrank = -1;
-         } else {
-            /*
-             * Even process -- exchange with rank + 1
-             * Send the right half of the input vector to the right neighbor,
-             * Recv the left half of the input vector from the right neighbor
-             */
-            res = NBC_Sched_send((char *)rbuf + (ptrdiff_t)count_lhalf * extent,
-                                 false, count_rhalf, datatype, rank + 1, schedule, false);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             res = NBC_Sched_recv(tmp_buf, false, count_lhalf, datatype, rank + 1,
-                                 schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             res = NBC_Sched_op(tmp_buf, false, rbuf, false, count_lhalf,
-                               datatype, op, schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             /* Recv the right half from the right neighbor */
-            res = NBC_Sched_recv((char *)rbuf + (ptrdiff_t)count_lhalf * extent,
-                                 false, count_rhalf, datatype, rank + 1, schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             vrank = rank / 2;
-        }
-    } else { /* rank >= 2 * nprocs_rem */
-        vrank = rank - nprocs_rem;
-    }
-     /*
-     * Step 2. Reduce-scatter implemented with recursive vector halving and
-     * recursive distance doubling. We have p' = 2^{\floor{\log_2 p}}
-     * power-of-two number of processes with new ranks (vrank) and result in rbuf.
-     *
-     * The even-ranked processes send the right half of their buffer to rank + 1
-     * and the odd-ranked processes send the left half of their buffer to
-     * rank - 1. All processes then compute the reduction between the local
-     * buffer and the received buffer. In the next \log_2(p') - 1 steps, the
-     * buffers are recursively halved, and the distance is doubled. At the end,
-     * each of the p' processes has 1 / p' of the total reduction result.
-     */
-    rindex = malloc(sizeof(*rindex) * nsteps);
-    sindex = malloc(sizeof(*sindex) * nsteps);
-    rcount = malloc(sizeof(*rcount) * nsteps);
-    scount = malloc(sizeof(*scount) * nsteps);
-    if (NULL == rindex || NULL == sindex || NULL == rcount || NULL == scount) {
-        res = OMPI_ERR_OUT_OF_RESOURCE;
-        goto cleanup_and_return;
-    }
-     if (vrank != -1) {
-        step = 0;
-        wsize = count;
-        sindex[0] = rindex[0] = 0;
-         for (int mask = 1; mask < nprocs_pof2; mask <<= 1) {
-            /*
-             * On each iteration: rindex[step] = sindex[step] -- begining of the
-             * current window. Length of the current window is storded in wsize.
-             */
-            int vdest = vrank ^ mask;
-            /* Translate vdest virtual rank to real rank */
-            int dest = (vdest < nprocs_rem) ? vdest * 2 : vdest + nprocs_rem;
-             if (rank < dest) {
-                /*
-                 * Recv into the left half of the current window, send the right
-                 * half of the window to the peer (perform reduce on the left
-                 * half of the current window)
-                 */
-                rcount[step] = wsize / 2;
-                scount[step] = wsize - rcount[step];
-                sindex[step] = rindex[step] + rcount[step];
-            } else {
-                /*
-                 * Recv into the right half of the current window, send the left
-                 * half of the window to the peer (perform reduce on the right
-                 * half of the current window)
-                 */
-                scount[step] = wsize / 2;
-                rcount[step] = wsize - scount[step];
-                rindex[step] = sindex[step] + scount[step];
-            }
-             /* Send part of data from the rbuf, recv into the tmp_buf */
-            res = NBC_Sched_send((char *)rbuf + (ptrdiff_t)sindex[step] * extent,
-                                 false, scount[step], datatype, dest, schedule, false);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-            res = NBC_Sched_recv((char *)tmp_buf + (ptrdiff_t)rindex[step] * extent,
-                                 false, rcount[step], datatype, dest, schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             /* Local reduce: rbuf[] = tmp_buf[] <op> rbuf[] */
-            res = NBC_Sched_op((char *)tmp_buf + (ptrdiff_t)rindex[step] * extent,
-                               false, (char *)rbuf + (ptrdiff_t)rindex[step] * extent,
-                               false, rcount[step], datatype, op, schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-             /* Move the current window to the received message */
-            if (step + 1 < nsteps) {
-                rindex[step + 1] = rindex[step];
-                sindex[step + 1] = rindex[step];
-                wsize = rcount[step];
-                step++;
-            }
-        }
+  } else { /* rank >= 2 * nprocs_rem */
+    vrank = rank - nprocs_rem;
+  }
+  /*
+   * Step 2. Reduce-scatter implemented with recursive vector halving and
+   * recursive distance doubling. We have p' = 2^{\floor{\log_2 p}}
+   * power-of-two number of processes with new ranks (vrank) and result in rbuf.
+   *
+   * The even-ranked processes send the right half of their buffer to rank + 1
+   * and the odd-ranked processes send the left half of their buffer to
+   * rank - 1. All processes then compute the reduction between the local
+   * buffer and the received buffer. In the next \log_2(p') - 1 steps, the
+   * buffers are recursively halved, and the distance is doubled. At the end,
+   * each of the p' processes has 1 / p' of the total reduction result.
+   */
+  rindex = malloc(sizeof(*rindex) * nsteps);
+  sindex = malloc(sizeof(*sindex) * nsteps);
+  rcount = malloc(sizeof(*rcount) * nsteps);
+  scount = malloc(sizeof(*scount) * nsteps);
+  if (NULL == rindex || NULL == sindex || NULL == rcount || NULL == scount) {
+    res = OMPI_ERR_OUT_OF_RESOURCE;
+    goto cleanup_and_return;
+  }
+  if (vrank != -1) {
+    step = 0;
+    wsize = count;
+    sindex[0] = rindex[0] = 0;
+    for (int mask = 1; mask < nprocs_pof2; mask <<= 1) {
+      /*
+       * On each iteration: rindex[step] = sindex[step] -- begining of the
+       * current window. Length of the current window is storded in wsize.
+       */
+      int vdest = vrank ^ mask;
+      /* Translate vdest virtual rank to real rank */
+      int dest = (vdest < nprocs_rem) ? vdest * 2 : vdest + nprocs_rem;
+      if (rank < dest) {
         /*
-         * Assertion: each process has 1 / p' of the total reduction result:
-         * rcount[nsteps - 1] elements in the rbuf[rindex[nsteps - 1], ...].
+         * Recv into the left half of the current window, send the right
+         * half of the window to the peer (perform reduce on the left
+         * half of the current window)
          */
-         /*
-         * Step 3. Allgather by the recursive doubling algorithm.
-         * Each process has 1 / p' of the total reduction result:
-         * rcount[nsteps - 1] elements in the rbuf[rindex[nsteps - 1], ...].
-         * All exchanges are executed in reverse order relative
-         * to recursive doubling (previous step).
+        rcount[step] = wsize / 2;
+        scount[step] = wsize - rcount[step];
+        sindex[step] = rindex[step] + rcount[step];
+      } else {
+        /*
+         * Recv into the right half of the current window, send the left
+         * half of the window to the peer (perform reduce on the right
+         * half of the current window)
          */
-        step = nsteps - 1;
-         for (int mask = nprocs_pof2 >> 1; mask > 0; mask >>= 1) {
-            int vdest = vrank ^ mask;
-            /* Translate vdest virtual rank to real rank */
-            int dest = (vdest < nprocs_rem) ? vdest * 2 : vdest + nprocs_rem;
-             /*
-             * Send rcount[step] elements from rbuf[rindex[step]...]
-             * Recv scount[step] elements to rbuf[sindex[step]...]
-             */
-            res = NBC_Sched_send((char *)rbuf + (ptrdiff_t)rindex[step] * extent,
-                                 false, rcount[step], datatype, dest, schedule, false);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-            res = NBC_Sched_recv((char *)rbuf + (ptrdiff_t)sindex[step] * extent,
-                                 false, scount[step], datatype, dest, schedule, true);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-            step--;
-        }
+        scount[step] = wsize / 2;
+        rcount[step] = wsize - scount[step];
+        rindex[step] = sindex[step] + scount[step];
+      }
+      /* Send part of data from the rbuf, recv into the tmp_buf */
+      res = PNBC_OSC_Sched_send((char *)rbuf + (ptrdiff_t)sindex[step] * extent,
+                           false, scount[step], datatype, dest, schedule, false);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      res = PNBC_OSC_Sched_recv((char *)tmp_buf + (ptrdiff_t)rindex[step] * extent,
+                           false, rcount[step], datatype, dest, schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      /* Local reduce: rbuf[] = tmp_buf[] <op> rbuf[] */
+      res = PNBC_OSC_Sched_op((char *)tmp_buf + (ptrdiff_t)rindex[step] * extent,
+                         false, (char *)rbuf + (ptrdiff_t)rindex[step] * extent,
+                         false, rcount[step], datatype, op, schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      /* Move the current window to the received message */
+      if (step + 1 < nsteps) {
+        rindex[step + 1] = rindex[step];
+        sindex[step + 1] = rindex[step];
+        wsize = rcount[step];
+        step++;
+      }
     }
-     /*
-     * Step 4. Send total result to excluded odd ranks.
+    /*
+     * Assertion: each process has 1 / p' of the total reduction result:
+     * rcount[nsteps - 1] elements in the rbuf[rindex[nsteps - 1], ...].
      */
-    if (rank < 2 * nprocs_rem) {
-        if (rank % 2 != 0) {
-            /* Odd process -- recv result from rank - 1 */
-            res = NBC_Sched_recv(rbuf, false, count, datatype, rank - 1, schedule, false);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-        } else {
-            /* Even process -- send result to rank + 1 */
-            res = NBC_Sched_send(rbuf, false, count, datatype, rank + 1, schedule, false);
-            if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
-        }
+    /*
+     * Step 3. Allgather by the recursive doubling algorithm.
+     * Each process has 1 / p' of the total reduction result:
+     * rcount[nsteps - 1] elements in the rbuf[rindex[nsteps - 1], ...].
+     * All exchanges are executed in reverse order relative
+     * to recursive doubling (previous step).
+     */
+    step = nsteps - 1;
+    for (int mask = nprocs_pof2 >> 1; mask > 0; mask >>= 1) {
+      int vdest = vrank ^ mask;
+      /* Translate vdest virtual rank to real rank */
+      int dest = (vdest < nprocs_rem) ? vdest * 2 : vdest + nprocs_rem;
+      /*
+       * Send rcount[step] elements from rbuf[rindex[step]...]
+       * Recv scount[step] elements to rbuf[sindex[step]...]
+       */
+      res = PNBC_OSC_Sched_send((char *)rbuf + (ptrdiff_t)rindex[step] * extent,
+                           false, rcount[step], datatype, dest, schedule, false);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      res = PNBC_OSC_Sched_recv((char *)rbuf + (ptrdiff_t)sindex[step] * extent,
+                           false, scount[step], datatype, dest, schedule, true);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+      step--;
     }
-   cleanup_and_return:
-    if (NULL != rindex)
-        free(rindex);
-    if (NULL != sindex)
-        free(sindex);
-    if (NULL != rcount)
-        free(rcount);
-    if (NULL != scount)
-        free(scount);
-    return res;
+  }
+  /*
+   * Step 4. Send total result to excluded odd ranks.
+   */
+  if (rank < 2 * nprocs_rem) {
+    if (rank % 2 != 0) {
+      /* Odd process -- recv result from rank - 1 */
+      res = PNBC_OSC_Sched_recv(rbuf, false, count, datatype, rank - 1, schedule, false);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+    } else {
+      /* Even process -- send result to rank + 1 */
+      res = PNBC_OSC_Sched_send(rbuf, false, count, datatype, rank + 1, schedule, false);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { goto cleanup_and_return; }
+    }
+  }
+ cleanup_and_return:
+  if (NULL != rindex)
+    free(rindex);
+  if (NULL != sindex)
+    free(sindex);
+  if (NULL != rcount)
+    free(rcount);
+  if (NULL != scount)
+    free(scount);
+  return res;
 }
 
-int ompi_coll_libpnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
-                                    struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
-                                    struct mca_coll_base_module_2_3_0_t *module) {
-    int res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op,
-                                 comm, request, module, true);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        return res;
-    }
+int ompi_coll_libpnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count,
+                                         MPI_Datatype datatype, MPI_Op op,
+                                         struct ompi_communicator_t *comm, MPI_Info info,
+                                         ompi_request_t ** request,
+                                         struct mca_coll_base_module_2_3_0_t *module) {
+  int res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op, comm, request,
+                               module, true);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    return res;
+  }
 
-    return OMPI_SUCCESS;
+  return OMPI_SUCCESS;
 }
 
 int ompi_coll_libpnbc_osc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
-                                          struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
-                                          struct mca_coll_base_module_2_3_0_t *module) {
-    int res = nbc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
-                                       comm, request, module, true);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        return res;
-    }
+                                               struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
+                                               struct mca_coll_base_module_2_3_0_t *module) {
+  int res = nbc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
+                                     comm, request, module, true);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    return res;
+  }
 
-    return OMPI_SUCCESS;
+  return OMPI_SUCCESS;
 }
-

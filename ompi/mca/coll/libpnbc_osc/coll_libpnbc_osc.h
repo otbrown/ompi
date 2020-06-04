@@ -24,8 +24,8 @@
  * $HEADER$
  */
 
-#ifndef MCA_COLL_LIBNBC_EXPORT_H
-#define MCA_COLL_LIBNBC_EXPORT_H
+#ifndef MCA_COLL_LIBPNBC_OSC_EXPORT_H
+#define MCA_COLL_LIBPNBC_OSC_EXPORT_H
 
 #include "ompi/mca/coll/coll.h"
 #include "ompi/request/request.h"
@@ -33,12 +33,12 @@
 
 BEGIN_C_DECLS
 
-/*********************** LibNBC tuning parameters ************************/
+/*********************** LibPNBC_OSC tuning parameters ************************/
 
 /* the debug level */
-#define NBC_DLEVEL 1
+#define PNBC_OSC_DLEVEL 1
 
-/* enable schedule caching - undef NBC_CACHE_SCHEDULE to deactivate it */
+/* enable schedule caching - undef PNBC_OSC_CACHE_SCHEDULE to deactivate it */
 /* TODO: this whole schedule cache stuff does not work with the tmbuf
  * :-( - first, the tmpbuf must not be freed if a schedule using it is
  * still in the cache and second, the tmpbuf used by the schedule must
@@ -46,28 +46,28 @@ BEGIN_C_DECLS
  * I.E., THIS IS EXPERIMENTAL AND MIGHT NOT WORK */
 /* It also leaks memory because the schedule is never cleaned up when
    the communicator is destroyed, so don't use it for now */
-#ifdef NBC_CACHE_SCHEDULE
-#undef NBC_CACHE_SCHEDULE
+#ifdef PNBC_OSC_CACHE_SCHEDULE
+#undef PNBC_OSC_CACHE_SCHEDULE
 #endif
-#define NBC_SCHED_DICT_UPPER 1024 /* max. number of dict entries */
-#define NBC_SCHED_DICT_LOWER 512  /* nuber of dict entries after wipe, if SCHED_DICT_UPPER is reached */
+#define PNBC_OSC_SCHED_DICT_UPPER 1024 /* max. number of dict entries */
+#define PNBC_OSC_SCHED_DICT_LOWER 512  /* nuber of dict entries after wipe, if SCHED_DICT_UPPER is reached */
 
-/********************* end of LibNBC tuning parameters ************************/
+/********************* end of LibPNBC_OSC tuning parameters ************************/
 
 /* Function return codes  */
-#define NBC_OK 0 /* everything went fine */
-#define NBC_SUCCESS 0 /* everything went fine (MPI compliant :) */
-#define NBC_OOR 1 /* out of resources */
-#define NBC_BAD_SCHED 2 /* bad schedule */
-#define NBC_CONTINUE 3 /* progress not done */
-#define NBC_DATATYPE_NOT_SUPPORTED 4 /* datatype not supported or not valid */
-#define NBC_OP_NOT_SUPPORTED 5 /* operation not supported or not valid */
-#define NBC_NOT_IMPLEMENTED 6
-#define NBC_INVALID_PARAM 7 /* invalid parameters */
-#define NBC_INVALID_TOPOLOGY_COMM 8 /* invalid topology attached to communicator */
+#define PNBC_OSC_OK 0 /* everything went fine */
+#define PNBC_OSC_SUCCESS 0 /* everything went fine (MPI compliant :) */
+#define PNBC_OSC_OOR 1 /* out of resources */
+#define PNBC_OSC_BAD_SCHED 2 /* bad schedule */
+#define PNBC_OSC_CONTINUE 3 /* progress not done */
+#define PNBC_OSC_DATATYPE_NOT_SUPPORTED 4 /* datatype not supported or not valid */
+#define PNBC_OSC_OP_NOT_SUPPORTED 5 /* operation not supported or not valid */
+#define PNBC_OSC_NOT_IMPLEMENTED 6
+#define PNBC_OSC_INVALID_PARAM 7 /* invalid parameters */
+#define PNBC_OSC_INVALID_TOPOLOGY_COMM 8 /* invalid topology attached to communicator */
 
 /* number of implemented collective functions */
-#define NBC_NUM_COLL 17
+#define PNBC_OSC_NUM_COLL 17
 
 extern bool libpnbc_osc_ibcast_skip_dt_decision;
 extern int libpnbc_osc_iallgather_algorithm;
@@ -99,18 +99,18 @@ struct ompi_coll_libpnbc_osc_module_t {
 typedef struct ompi_coll_libpnbc_osc_module_t ompi_coll_libpnbc_osc_module_t;
 OBJ_CLASS_DECLARATION(ompi_coll_libpnbc_osc_module_t);
 
-typedef ompi_coll_libpnbc_osc_module_t NBC_Comminfo;
+typedef ompi_coll_libpnbc_osc_module_t PNBC_OSC_Comminfo;
 
-struct NBC_Schedule {
+struct PNBC_OSC_Schedule {
     opal_object_t super;
     volatile int size;
     volatile int current_round_offset;
     char *data;
 };
 
-typedef struct NBC_Schedule NBC_Schedule;
+typedef struct PNBC_OSC_Schedule PNBC_OSC_Schedule;
 
-OBJ_CLASS_DECLARATION(NBC_Schedule);
+OBJ_CLASS_DECLARATION(PNBC_OSC_Schedule);
 
 struct ompi_coll_libpnbc_osc_request_t {
     ompi_request_t super;
@@ -120,8 +120,8 @@ struct ompi_coll_libpnbc_osc_request_t {
     int tag;
     volatile int req_count;
     ompi_request_t **req_array;
-    NBC_Comminfo *comminfo;
-    NBC_Schedule *schedule;
+    PNBC_OSC_Comminfo *comminfo;
+    PNBC_OSC_Schedule *schedule;
     MPI_Win win;
     void *tmpbuf; /* temporary buffer e.g. used for Reduce */
     /* TODO: we should make a handle pointer to a state later (that the user
@@ -130,10 +130,10 @@ struct ompi_coll_libpnbc_osc_request_t {
 typedef struct ompi_coll_libpnbc_osc_request_t ompi_coll_libpnbc_osc_request_t;
 OBJ_CLASS_DECLARATION(ompi_coll_libpnbc_osc_request_t);
 
-typedef ompi_coll_libpnbc_osc_request_t NBC_Handle;
+typedef ompi_coll_libpnbc_osc_request_t PNBC_OSC_Handle;
 
 
-#define OMPI_COLL_LIBNBC_REQUEST_ALLOC(comm, persistent, req)           \
+#define OMPI_COLL_LIBPNBC_OSC_REQUEST_ALLOC(comm, persistent, req)           \
     do {                                                                \
         opal_free_list_item_t *item;                                    \
         item = opal_free_list_wait (&mca_coll_libpnbc_osc_component.requests); \
@@ -142,7 +142,7 @@ typedef ompi_coll_libpnbc_osc_request_t NBC_Handle;
         req->super.req_mpi_object.comm = comm;                          \
     } while (0)
 
-#define OMPI_COLL_LIBNBC_REQUEST_RETURN(req)                            \
+#define OMPI_COLL_LIBPNBC_OSC_REQUEST_RETURN(req)                            \
     do {                                                                \
         OMPI_REQUEST_FINI(&(req)->super);                               \
         opal_free_list_return (&mca_coll_libpnbc_osc_component.requests,     \
@@ -151,8 +151,8 @@ typedef ompi_coll_libpnbc_osc_request_t NBC_Handle;
 
 int ompi_coll_libpnbc_osc_progress(void);
 
-int NBC_Init_comm(MPI_Comm comm, ompi_coll_libpnbc_osc_module_t *module);
-int NBC_Progress(NBC_Handle *handle);
+int PNBC_OSC_Init_comm(MPI_Comm comm, ompi_coll_libpnbc_osc_module_t *module);
+int PNBC_OSC_Progress(PNBC_OSC_Handle *handle);
 
 
 int ompi_coll_libpnbc_osc_iallgather(const void* sendbuf, int sendcount, MPI_Datatype sendtype, void* recvbuf, int recvcount,
@@ -413,4 +413,4 @@ int ompi_coll_libpnbc_osc_neighbor_alltoallw_init(const void *sbuf, const int *s
 
 END_C_DECLS
 
-#endif /* MCA_COLL_LIBNBC_EXPORT_H */
+#endif /* MCA_COLL_LIBPNBC_OSC_EXPORT_H */
