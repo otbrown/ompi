@@ -262,22 +262,30 @@ static int PNBC_OSC_Sched_send_internal (const void* buf, char tmpbuf, int count
   return OMPI_SUCCESS;
 }
 
-int PNBC_OSC_Sched_local_put (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                         int target, PNBC_OSC_Schedule *schedule, bool barrier) {
-  return PNBC_OSC_Sched_send_internal (buf, tmpbuf, origin_count, origin_datatype, target, true,
-                                  schedule, barrier);
+int PNBC_OSC_Sched_local_put (const void* buf, char tmpbuf, int origin_count,
+                              MPI_Datatype origin_datatype, int target,
+                              PNBC_OSC_Schedule *schedule, bool barrier) {
+  
+  return PNBC_OSC_Sched_send_internal (buf, tmpbuf, origin_count, origin_datatype,
+                                       target, true, schedule, barrier);
 }
 
-int PNBC_OSC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, PNBC_OSC_Schedule *schedule, bool barrier) {
-  return PNBC_OSC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, false, schedule, barrier);
+int PNBC_OSC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype,
+                         int dest, PNBC_OSC_Schedule *schedule, bool barrier) {
+  return PNBC_OSC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, false,
+                                       schedule, barrier);
 }
 
-int PNBC_OSC_Sched_local_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, PNBC_OSC_Schedule *schedule, bool barrier) {
-  return PNBC_OSC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, true, schedule, barrier);
+int PNBC_OSC_Sched_local_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype,
+                               int dest, PNBC_OSC_Schedule *schedule, bool barrier) {
+  return PNBC_OSC_Sched_send_internal (buf, tmpbuf, count, datatype, dest, true,
+                                       schedule, barrier);
 }
 
 /* this function puts a receive into the schedule */
-static int PNBC_OSC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, bool local, PNBC_OSC_Schedule *schedule, bool barrier) {
+static int PNBC_OSC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_Datatype datatype,
+                                         int source, bool local, PNBC_OSC_Schedule *schedule,
+                                         bool barrier) {
   PNBC_OSC_Args_recv recv_args;
   int ret;
 

@@ -201,34 +201,47 @@ extern "C" {
 
   /* internal function prototypes */
   /* Put */
-  int PNBC_OSC_Sched_put (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                     int target, int target_count,  MPI_Datatype target_datatype,
-                     PNBC_OSC_Schedule *schedule, bool barrier);
+  int PNBC_OSC_Sched_put (const void* buf, char tmpbuf, int origin_count,
+                          MPI_Datatype origin_datatype,
+                          int target, int target_count,  MPI_Datatype target_datatype,
+                          PNBC_OSC_Schedule *schedule, bool barrier);
   int PNBC_OSC_Sched_local_put (const void* buf, char tmpbuf, int origin_count,
-                           MPI_Datatype origin_datatype,
-                           int target, PNBC_OSC_Schedule *schedule, bool barrier);
+                                MPI_Datatype origin_datatype, int target,
+                                PNBC_OSC_Schedule *schedule, bool barrier);
 
   /* Get */
-  int PNBC_OSC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                     int target, int target_count,  MPI_Datatype target_datatype,
-                     PNBC_OSC_Schedule *schedule, bool barrier);
+  int PNBC_OSC_Sched_get (const void* buf, char tmpbuf, int origin_count,
+                          MPI_Datatype origin_datatype, int target,
+                          int target_count,  MPI_Datatype target_datatype,
+                          PNBC_OSC_Schedule *schedule, bool barrier);
   int PNBC_OSC_Sched_local_get (const void* buf, char tmpbuf, int origin_count,
-                           MPI_Datatype origin_datatype, int target, PNBC_OSC_Schedule *schedule,
-                           bool barrier);
+                                MPI_Datatype origin_datatype, int target,
+                                PNBC_OSC_Schedule *schedule, bool barrier);
   /* try_get */
-  int PNBC_OSC_Sched_try_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                         int target, int target_count,  MPI_Datatype target_datatype,
-                         PNBC_OSC_Schedule *schedule, int lock_type, int assert, bool barrier);
-  int PNBC_OSC_Sched_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, PNBC_OSC_Schedule *schedule, bool barrier);
-  int PNBC_OSC_Sched_local_send (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest,PNBC_OSC_Schedule *schedule, bool barrier);
-  int PNBC_OSC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, PNBC_OSC_Schedule *schedule, bool barrier);
-  int PNBC_OSC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, PNBC_OSC_Schedule *schedule, bool barrier);
-  int PNBC_OSC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int count, MPI_Datatype datatype,
-                    MPI_Op op, PNBC_OSC_Schedule *schedule, bool barrier);
-  int PNBC_OSC_Sched_copy (void *src, char tmpsrc, int srccount, MPI_Datatype srctype, void *tgt, char tmptgt, int tgtcount,
-                      MPI_Datatype tgttype, PNBC_OSC_Schedule *schedule, bool barrier);
-  int PNBC_OSC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype datatype, void *outbuf, char tmpoutbuf,
-                        PNBC_OSC_Schedule *schedule, bool barrier);
+  int PNBC_OSC_Sched_try_get (const void* buf, char tmpbuf, int origin_count,
+                              MPI_Datatype origin_datatype, int target,
+                              int target_count,  MPI_Datatype target_datatype,
+                              PNBC_OSC_Schedule *schedule, int lock_type,
+                              int assert, bool barrier);
+  int PNBC_OSC_Sched_send (const void* buf, char tmpbuf, int count,
+                           MPI_Datatype datatype, int dest,
+                           PNBC_OSC_Schedule *schedule, bool barrier);
+  int PNBC_OSC_Sched_local_send (const void* buf, char tmpbuf, int count,
+                                 MPI_Datatype datatype, int dest,
+                                 PNBC_OSC_Schedule *schedule, bool barrier);
+  int PNBC_OSC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype,
+                           int source, PNBC_OSC_Schedule *schedule, bool barrier);
+  int PNBC_OSC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype
+                                 , int source, PNBC_OSC_Schedule *schedule, bool barrier);
+  int PNBC_OSC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int count,
+                         MPI_Datatype datatype, MPI_Op op, PNBC_OSC_Schedule *schedule,
+                         bool barrier);
+  int PNBC_OSC_Sched_copy (void *src, char tmpsrc, int srccount, MPI_Datatype srctype,
+                           void *tgt, char tmptgt, int tgtcount,
+                           MPI_Datatype tgttype, PNBC_OSC_Schedule *schedule, bool barrier);
+  int PNBC_OSC_Sched_unpack (void *inbuf, char tmpinbuf, int count, MPI_Datatype datatype,
+                             void *outbuf, char tmpoutbuf,
+                             PNBC_OSC_Schedule *schedule, bool barrier);
   
   int PNBC_OSC_Sched_win_free(PNBC_OSC_Schedule *schedule, bool barrier);
   int PNBC_OSC_Sched_barrier (PNBC_OSC_Schedule *schedule);
@@ -237,11 +250,11 @@ extern "C" {
 
   int PNBC_OSC_Start(PNBC_OSC_Handle *handle);
   int PNBC_OSC_Schedule_request(PNBC_OSC_Schedule *schedule, ompi_communicator_t *comm,
-                           ompi_coll_libpnbc_osc_module_t *module, bool persistent,
-                           ompi_request_t **request, void *tmpbuf);
+                                ompi_coll_libpnbc_osc_module_t *module, bool persistent,
+                                ompi_request_t **request, void *tmpbuf);
   int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator_t *comm,
-                               ompi_win_t *win, ompi_coll_libpnbc_osc_module_t *module,
-                               bool persistent, ompi_request_t **request, void *tmpbuf);
+                                    ompi_win_t *win, ompi_coll_libpnbc_osc_module_t *module,
+                                    bool persistent, ompi_request_t **request, void *tmpbuf);
   
   void PNBC_OSC_Return_handle(ompi_coll_libpnbc_osc_request_t *request);
   
@@ -249,7 +262,7 @@ extern "C" {
   int PNBC_OSC_Create_fortran_handle(int *fhandle, PNBC_OSC_Handle **handle);
   
   /* some macros */
-
+  
   static inline void PNBC_OSC_Error (char *format, ...) {
     va_list args;
 
@@ -493,7 +506,9 @@ extern "C" {
   }
 
   /* let's give a try to inline functions */
-  static inline int PNBC_OSC_Copy(const void *src, int srccount, MPI_Datatype srctype, void *tgt, int tgtcount, MPI_Datatype tgttype, MPI_Comm comm) {
+  static inline int PNBC_OSC_Copy(const void *src, int srccount, MPI_Datatype srctype,
+                                  void *tgt, int tgtcount, MPI_Datatype tgttype,
+                                  MPI_Comm comm) {
     int res;
 
     res = ompi_datatype_sndrcv(src, srccount, srctype, tgt, tgtcount, tgttype);
@@ -505,7 +520,8 @@ extern "C" {
     return OMPI_SUCCESS;
   }
 
-  static inline int PNBC_OSC_Unpack(void *src, int srccount, MPI_Datatype srctype, void *tgt, MPI_Comm comm) {
+  static inline int PNBC_OSC_Unpack(void *src, int srccount, MPI_Datatype srctype,
+                                    void *tgt, MPI_Comm comm) {
     MPI_Aint size, pos;
     int res;
     ptrdiff_t ext, lb;
@@ -533,7 +549,8 @@ extern "C" {
       } else {
         /* we have to unpack */
         pos = 0;
-        res = ompi_datatype_unpack_external("external32", src, size, &pos, tgt, srccount, srctype);
+        res = ompi_datatype_unpack_external("external32", src, size, &pos, tgt,
+                                            srccount, srctype);
         if (MPI_SUCCESS != res) {
           PNBC_OSC_Error ("MPI Error in ompi_datatype_unpack_external() (%i)", res);
           return res;
@@ -559,8 +576,11 @@ extern "C" {
           }                                     \
     }
 
-    int PNBC_OSC_Comm_neighbors_count (ompi_communicator_t *comm, int *indegree, int *outdegree);
-    int PNBC_OSC_Comm_neighbors (ompi_communicator_t *comm, int **sources, int *source_count, int **destinations, int *dest_count);
+    int PNBC_OSC_Comm_neighbors_count (ompi_communicator_t *comm, int *indegree,
+                                       int *outdegree);
+    int PNBC_OSC_Comm_neighbors (ompi_communicator_t *comm, int **sources,
+                                 int *source_count, int **destinations,
+                                 int *dest_count);
 
 #ifdef __cplusplus
   }

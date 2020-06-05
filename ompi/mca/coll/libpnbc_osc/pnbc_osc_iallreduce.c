@@ -44,10 +44,12 @@ static inline int allred_sched_redscat_allgather(int rank, int comm_size, int co
                                                  char inplace, PNBC_OSC_Schedule *schedule,
                                                  void *tmpbuf, struct ompi_communicator_t *comm);
 
+/**********************************************************************************************/
 
-static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
-                              MPI_Op op, struct ompi_communicator_t *comm, ompi_request_t ** request,
-                              struct mca_coll_base_module_2_3_0_t *module, bool persistent)
+static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count,
+                                   MPI_Datatype datatype, MPI_Op op,
+                                   struct ompi_communicator_t *comm, ompi_request_t ** request,
+                                   struct mca_coll_base_module_2_3_0_t *module, bool persistent)
 {
   int rank, p, res;
   ptrdiff_t ext, lb;
@@ -55,7 +57,8 @@ static int nbc_allreduce_init(const void* sendbuf, void* recvbuf, int count, MPI
   size_t size;
   ompi_win_t *win;
   struct ompi_info_t * info = &ompi_mpi_info_null.info;
-  enum { PNBC_OSC_ARED_BINOMIAL, PNBC_OSC_ARED_RING, PNBC_OSC_ARED_REDSCAT_ALLGATHER, PNBC_OSC_ARED_BINOMIAL_RMA } alg;
+  enum { PNBC_OSC_ARED_BINOMIAL, PNBC_OSC_ARED_RING, PNBC_OSC_ARED_REDSCAT_ALLGATHER,
+         PNBC_OSC_ARED_BINOMIAL_RMA } alg;
   char inplace;
   void *tmpbuf = NULL;
   void *tmpsbuf = NULL;
@@ -206,30 +209,12 @@ if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
 return OMPI_SUCCESS;
 }
 
-int ompi_coll_libpnbc_osc_iallreduce(const void* sendbuf, void* recvbuf, int count,
-                                     MPI_Datatype datatype, MPI_Op op,
-                                     struct ompi_communicator_t *comm, ompi_request_t ** request,
-                                     struct mca_coll_base_module_2_3_0_t *module) {
-  int res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op, comm, request,
-                               module, false);
-  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-    return res;
-  }
 
-  res = PNBC_OSC_Start(*(ompi_coll_libpnbc_osc_request_t **)request);
-  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-    PNBC_OSC_Return_handle (*(ompi_coll_libpnbc_osc_request_t **)request);
-    *request = &ompi_request_null.request;
-    return res;
-  }
-
-  return OMPI_SUCCESS;
-}
-
-static int nbc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count,
-                                    MPI_Datatype datatype, MPI_Op op,
-                                    struct ompi_communicator_t *comm, ompi_request_t ** request,
-                                    struct mca_coll_base_module_2_3_0_t *module, bool persistent)
+static int pnbc_osc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count,
+                                         MPI_Datatype datatype, MPI_Op op,
+                                         struct ompi_communicator_t *comm, ompi_request_t ** request,
+                                         struct mca_coll_base_module_2_3_0_t *module,
+                                         bool persistent)
 {
   int rank, res, rsize;
   size_t size;
@@ -296,8 +281,8 @@ int ompi_coll_libpnbc_osc_iallreduce_inter(const void* sendbuf, void* recvbuf, i
                                            struct ompi_communicator_t *comm,
                                            ompi_request_t ** request,
                                            struct mca_coll_base_module_2_3_0_t *module) {
-  int res = nbc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
-                                     comm, request, module, false);
+  int res = pnbc_osc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
+                                          comm, request, module, false);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     return res;
   }
@@ -420,8 +405,10 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
   return OMPI_SUCCESS;
 }
 
-static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype datatype, ptrdiff_t gap, const void *sendbuf, void *recvbuf,
-                                    MPI_Op op, char inplace, PNBC_OSC_Schedule *schedule, void *tmpbuf) {
+static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype datatype,
+                                    ptrdiff_t gap, const void *sendbuf, void *recvbuf,
+                                    MPI_Op op, char inplace, PNBC_OSC_Schedule *schedule,
+                                    void *tmpbuf) {
   int root, vrank, maxr, vpeer, peer, res;
   char *rbuf, *lbuf, *buf;
   int tmprbuf, tmplbuf;
@@ -465,11 +452,13 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
           /* this cannot be done until tmpbuf is unused :-( so barrier after the op */
           if (firstred && !inplace) {
             /* perform the reduce with the senbuf */
-            res = PNBC_OSC_Sched_op (sendbuf, false, rbuf, tmprbuf, count, datatype, op, schedule, true);
+            res = PNBC_OSC_Sched_op (sendbuf, false, rbuf, tmprbuf, count, datatype, op,
+                                     schedule, true);
             firstred = 0;
           } else {
             /* perform the reduce in my local buffer */
-            res = PNBC_OSC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op, schedule, true);
+            res = PNBC_OSC_Sched_op (lbuf, tmplbuf, rbuf, tmprbuf, count, datatype, op,
+                                     schedule, true);
           }
           if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
             return res;
@@ -537,7 +526,8 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
   return OMPI_SUCCESS;
 }
 
-static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datatype, const void *sendbuf, void *recvbuf, MPI_Op op,
+static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datatype,
+                                     const void *sendbuf, void *recvbuf, MPI_Op op,
                                      int size, int ext, PNBC_OSC_Schedule *schedule, void *tmpbuf) {
   int segsize, *segsizes, *segoffsets; /* segment sizes and offsets per segment (number of segments == number of nodes */
   int speer, rpeer; /* send and recvpeer */
@@ -737,8 +727,10 @@ static inline int allred_sched_ring (int r, int p, int count, MPI_Datatype datat
   return res;
 }
 
-static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
-                                      ptrdiff_t gap, MPI_Op op, int ext, int size, PNBC_OSC_Schedule *schedule, void *tmpbuf) {
+static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, void *recvbuf,
+                                      int count, MPI_Datatype datatype, ptrdiff_t gap,
+                                      MPI_Op op, int ext, int size, PNBC_OSC_Schedule *schedule,
+                                      void *tmpbuf) {
   int res;
 
   if (0 == count) {
@@ -877,10 +869,11 @@ static inline int allred_sched_linear(int rank, int rsize, const void *sendbuf, 
  *
  * Schedule length (rounds): O(\log(p))
  */
-static inline int allred_sched_redscat_allgather(
-                                                 int rank, int comm_size, int count, MPI_Datatype datatype, ptrdiff_t gap,
-                                                 const void *sbuf, void *rbuf, MPI_Op op, char inplace,
-                                                 PNBC_OSC_Schedule *schedule, void *tmpbuf, struct ompi_communicator_t *comm)
+static inline int allred_sched_redscat_allgather(int rank, int comm_size, int count,
+                                                 MPI_Datatype datatype, ptrdiff_t gap,
+                                                 const void *sbuf, void *rbuf, MPI_Op op,
+                                                 char inplace, PNBC_OSC_Schedule *schedule,
+                                                 void *tmpbuf, struct ompi_communicator_t *comm)
 {
   int res = OMPI_SUCCESS;
   int *rindex = NULL, *rcount = NULL, *sindex = NULL, *scount = NULL;
@@ -1093,20 +1086,24 @@ int ompi_coll_libpnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int
                                          struct ompi_communicator_t *comm, MPI_Info info,
                                          ompi_request_t ** request,
                                          struct mca_coll_base_module_2_3_0_t *module) {
-  int res = nbc_allreduce_init(sendbuf, recvbuf, count, datatype, op, comm, request,
-                               module, true);
+
+  int res = pnbc_osc_allreduce_init(sendbuf, recvbuf, count, datatype, op, comm, request,
+                                    module, true);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     return res;
   }
-
+  
   return OMPI_SUCCESS;
 }
 
-int ompi_coll_libpnbc_osc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
-                                               struct ompi_communicator_t *comm, MPI_Info info, ompi_request_t ** request,
+int ompi_coll_libpnbc_osc_allreduce_inter_init(const void* sendbuf, void* recvbuf,
+                                               int count, MPI_Datatype datatype, MPI_Op op,
+                                               struct ompi_communicator_t *comm, MPI_Info info,
+                                               ompi_request_t ** request,
                                                struct mca_coll_base_module_2_3_0_t *module) {
-  int res = nbc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op,
-                                     comm, request, module, true);
+
+  int res = pnbc_osc_allreduce_inter_init(sendbuf, recvbuf, count, datatype, op, comm, request,
+                                     module, true);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     return res;
   }
