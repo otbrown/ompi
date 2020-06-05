@@ -266,7 +266,8 @@ static int pnbc_osc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int
     return res;
   }
 
-  res = PNBC_OSC_Schedule_request(schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
+  res = PNBC_OSC_Schedule_request_win(schedule, comm, libpnbc_osc_module, persistent,
+                                      request, tmpbuf);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
