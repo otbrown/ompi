@@ -199,12 +199,13 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
     return res;
   }
 
-res = PNBC_OSC_Schedule_request (schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
-if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-  OBJ_RELEASE(schedule);
-  free(tmpbuf);
-  return res;
- }
+  res = PNBC_OSC_Schedule_request_win(schedule, comm, win, libpnbc_osc_module, persistent,
+                                      request, tmpbuf);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    OBJ_RELEASE(schedule);
+    free(tmpbuf);
+    return res;
+  }
 
 return OMPI_SUCCESS;
 }
@@ -265,9 +266,7 @@ static int pnbc_osc_allreduce_inter_init(const void* sendbuf, void* recvbuf, int
     free(tmpbuf);
     return res;
   }
-
-  res = PNBC_OSC_Schedule_request_win(schedule, comm, libpnbc_osc_module, persistent,
-                                      request, tmpbuf);
+  res = PNBC_OSC_Schedule_request (schedule, comm, libpnbc_osc_module, persistent, request, tmpbuf);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
