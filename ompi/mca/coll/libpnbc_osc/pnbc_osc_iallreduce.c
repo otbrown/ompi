@@ -29,9 +29,10 @@
 static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype datatype, ptrdiff_t gap,
                                     const void *sendbuf, void *recvbuf, MPI_Op op, char inplace,
                                     PNBC_OSC_Schedule *schedule, void *tmpbuf);
-static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype datatype, ptrdiff_t gap,
-                                        void *sendbuf, void *recvbuf, MPI_Op op, char inplace,
-                                        PNBC_OSC_Schedule *schedule, void *tmpbuf, ompi_request_t ** request);
+static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype datatype,
+                                        ptrdiff_t gap, void *sendbuf, void *recvbuf, MPI_Op op,
+                                        char inplace, PNBC_OSC_Schedule *schedule, void *tmpbuf,
+                                        ompi_request_t ** request);
 static inline int allred_sched_ring(int rank, int p, int count, MPI_Datatype datatype,
                                     const void *sendbuf, void *recvbuf, MPI_Op op, int size,
                                     int ext, PNBC_OSC_Schedule *schedule, void *tmpbuf);

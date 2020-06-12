@@ -43,7 +43,8 @@ void PNBC_OSC_Reset_times() {
 }
 
 void PNBC_OSC_Print_times(double div) {
-printf("*** PNBC_OSC_TIMES: Isend: %lf, Irecv: %lf, Wait: %lf, Test: %lf\n", Isend_time*1e6/div, Irecv_time*1e6/div,
+printf("*** PNBC_OSC_TIMES: Isend: %lf, Irecv: %lf, Wait: %lf, Test: %lf\n",
+       Isend_time*1e6/div, Irecv_time*1e6/div,
        Wait_time*1e6/div, Test_time*1e6/div);
 }
 #endif
