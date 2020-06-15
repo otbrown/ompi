@@ -230,16 +230,19 @@ static int PNBC_OSC_Sched_try_get_internal (const void* buf, char tmpbuf, int or
   return OMPI_SUCCESS;
 }
 
-int PNBC_OSC_Sched_try_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                       int target, int target_count,  MPI_Datatype target_datatype,
-                       PNBC_OSC_Schedule *schedule, int lock_type, int assert, bool barrier) {
-  return PNBC_OSC_Sched_try_get_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
-                                     target_datatype, false, schedule, lock_type, assert, barrier);
+int PNBC_OSC_Sched_try_get (const void* buf, char tmpbuf, int origin_count,
+                            MPI_Datatype origin_datatype, int target, int target_count,
+                            MPI_Datatype target_datatype, PNBC_OSC_Schedule *schedule,
+                            int lock_type, int assert, bool barrier) {
+  return PNBC_OSC_Sched_try_get_internal (buf, tmpbuf, origin_count, origin_datatype, target,
+                                          target_count, target_datatype, false, schedule,
+                                          lock_type, assert, barrier);
 }
 
 /* this function puts a send into the schedule */
-static int PNBC_OSC_Sched_send_internal (const void* buf, char tmpbuf, int count, MPI_Datatype datatype, int dest, bool local,
-                                    PNBC_OSC_Schedule *schedule, bool barrier) {
+static int PNBC_OSC_Sched_send_internal (const void* buf, char tmpbuf, int count,
+                                         MPI_Datatype datatype, int dest, bool local,
+                                         PNBC_OSC_Schedule *schedule, bool barrier) {
   PNBC_OSC_Args_send send_args;
   int ret;
 
@@ -310,25 +313,29 @@ static int PNBC_OSC_Sched_recv_internal (void* buf, char tmpbuf, int count, MPI_
   return OMPI_SUCCESS;
 }
 
-int PNBC_OSC_Sched_local_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                         int target, PNBC_OSC_Schedule *schedule, bool barrier) {
+int PNBC_OSC_Sched_local_get (const void* buf, char tmpbuf, int origin_count,
+                              MPI_Datatype origin_datatype, int target,
+                              PNBC_OSC_Schedule *schedule, bool barrier) {
   printf("No implementation yet\n");
   exit(0);
-  /* return PNBC_OSC_Sched_recv_internal(buf, tmpbuf, origin_count, origin_datatype, target, true, */
-  /*                                schedule, barrier); */
 }
 
-int PNBC_OSC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, PNBC_OSC_Schedule *schedule, bool barrier) {
-  return PNBC_OSC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, false, schedule, barrier);
+int PNBC_OSC_Sched_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype,
+                         int source, PNBC_OSC_Schedule *schedule, bool barrier) {
+  return PNBC_OSC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, false,
+                                      schedule, barrier);
 }
 
-int PNBC_OSC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype, int source, PNBC_OSC_Schedule *schedule, bool barrier) {
-  return PNBC_OSC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, true, schedule, barrier);
+int PNBC_OSC_Sched_local_recv (void* buf, char tmpbuf, int count, MPI_Datatype datatype,
+                               int source, PNBC_OSC_Schedule *schedule, bool barrier) {
+  return PNBC_OSC_Sched_recv_internal(buf, tmpbuf, count, datatype, source, true, schedule,
+                                      barrier);
 }
 
 /* this function puts an operation into the schedule */
-int PNBC_OSC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int count, MPI_Datatype datatype,
-                  MPI_Op op, PNBC_OSC_Schedule *schedule, bool barrier) {
+int PNBC_OSC_Sched_op (const void* buf1, char tmpbuf1, void* buf2, char tmpbuf2, int count,
+                       MPI_Datatype datatype, MPI_Op op, PNBC_OSC_Schedule *schedule,
+                       bool barrier) {
   PNBC_OSC_Args_op op_args;
   int ret;
 
@@ -497,7 +504,8 @@ int PNBC_OSC_Progress(PNBC_OSC_Handle *handle) {
         ompi_request_t *subreq = handle->req_array[handle->req_count - 1];
         if (REQUEST_COMPLETE(subreq)) {
             if(OPAL_UNLIKELY( OMPI_SUCCESS != subreq->req_status.MPI_ERROR )) {
-                PNBC_OSC_Error ("MPI Error in PNBC_OSC subrequest %p : %d", subreq, subreq->req_status.MPI_ERROR);
+                PNBC_OSC_Error ("MPI Error in PNBC_OSC subrequest %p : %d", subreq,
+                                subreq->req_status.MPI_ERROR);
                 /* copy the error code from the underlying request and let the
                  * round finish */
                 handle->super.req_status.MPI_ERROR = subreq->req_status.MPI_ERROR;
@@ -537,7 +545,8 @@ int PNBC_OSC_Progress(PNBC_OSC_Handle *handle) {
     }
 
     /* adjust delim to start of current round */
-    PNBC_OSC_DEBUG(5, "PNBC_OSC_Progress: going in schedule %p to row-offset: %li\n", handle->schedule, handle->row_offset);
+    PNBC_OSC_DEBUG(5, "PNBC_OSC_Progress: going in schedule %p to row-offset: %li\n",
+                   handle->schedule, handle->row_offset);
     delim = handle->schedule->data + handle->row_offset;
     PNBC_OSC_DEBUG(10, "delim: %p\n", delim);
     nbc_get_round_size(delim, &size);
@@ -595,7 +604,8 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
   ptr = handle->schedule->data + handle->row_offset;
 
   PNBC_OSC_GET_BYTES(ptr,num);
-  PNBC_OSC_DEBUG(10, "start_round round at offset %d : posting %i operations\n", handle->row_offset, num);
+  PNBC_OSC_DEBUG(10, "start_round round at offset %d : posting %i operations\n",
+                 handle->row_offset, num);
 
   for (int i = 0 ; i < num ; ++i) {
     int offset = (intptr_t)(ptr - handle->schedule->data);
@@ -609,7 +619,8 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
       /* get an additional request */
       handle->req_count++;
 
-      tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
+      tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count *
+                                     sizeof (MPI_Request));
       if (NULL == tmp) {
         return OMPI_ERR_OUT_OF_RESOURCE;
       }
@@ -635,9 +646,9 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
       PNBC_OSC_DEBUG(5,"  PUT (offset %li) ", offset);
       PNBC_OSC_GET_BYTES(ptr,putargs);
       PNBC_OSC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n",
-                putargs.buf, putargs.origin_count, putargs.origin_datatype, putargs.target, putargs.target_count,
-                putargs.target_datatype, handle->tag);
-
+                     putargs.buf, putargs.origin_count, putargs.origin_datatype, putargs.target,
+                     putargs.target_count, putargs.target_datatype, handle->tag);
+      
       /* get an additional request */
       handle->req_count++;
       /* get buffer */
@@ -649,7 +660,8 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
 #ifdef PNBC_OSC_TIMING
       Iput_time -= MPI_Wtime();
 #endif
-      tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
+      tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count *
+                                     sizeof (MPI_Request));
       if (NULL == tmp) {
         return OMPI_ERR_OUT_OF_RESOURCE;
       }
@@ -660,10 +672,11 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
                                                putargs.target_datatype, handle->win);
 
       if (OMPI_SUCCESS != res) {
-        PNBC_OSC_Error ("Error in MPI_Iput(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)", (unsigned long)buf1,
-                   putargs.origin_count, putargs.origin_datatype, putargs.target,
-                   putargs.target_count, putargs.target_datatype, handle->tag,
-                   (unsigned long)handle->comm, res);
+        PNBC_OSC_Error ("Error in MPI_Iput(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)",
+                        (unsigned long)buf1,
+                        putargs.origin_count, putargs.origin_datatype, putargs.target,
+                        putargs.target_count, putargs.target_datatype, handle->tag,
+                        (unsigned long)handle->comm, res);
         return res;
       }
 #ifdef PNBC_OSC_TIMING
@@ -688,7 +701,8 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
       Iget_time -= MPI_Wtime();
 #endif
       //TODO: I am not too sure we need to realloc for PUT/GET - Not used
-      tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
+      tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count *
+                                     sizeof (MPI_Request));
       if (NULL == tmp) {
         return OMPI_ERR_OUT_OF_RESOURCE;
       }
@@ -700,10 +714,11 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
                                                getargs.target_datatype, handle->win);
 
       if (OMPI_SUCCESS != res) {
-        PNBC_OSC_Error ("Error in MPI_Iget(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)", (unsigned long)buf1,
-                   getargs.origin_count, getargs.origin_datatype, getargs.target,
-                   getargs.target_count, getargs.target_datatype,  handle->tag,
-                   (unsigned long)handle->comm, res);
+        PNBC_OSC_Error ("Error in MPI_Iget(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)",
+                        (unsigned long)buf1,
+                        getargs.origin_count, getargs.origin_datatype, getargs.target,
+                        getargs.target_count, getargs.target_datatype,  handle->tag,
+                        (unsigned long)handle->comm, res);
         return res;
       }
 #ifdef PNBC_OSC_TIMING
@@ -712,11 +727,12 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
 
       break;
     case TRY_GET:
-      PNBC_OSC_DEBUG(5,"  TRY_GET (offset %li) ", offset);
+      PNBC_OSC_DEBUG(10,"  TRY_GET (offset %li) ", offset);
       PNBC_OSC_GET_BYTES(ptr,trygetargs);
-      PNBC_OSC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n",
-                trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target,
-                trygetargs.target_count, trygetargs.target_datatype, handle->tag);
+      PNBC_OSC_DEBUG(10,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n",
+                     trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype,
+                     trygetargs.target, trygetargs.target_count, trygetargs.target_datatype,
+                     handle->tag);
 
       /* get an additional request */
       handle->req_count++;
@@ -745,15 +761,14 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
           if (OMPI_SUCCESS != res){
             /* return error code */
             PNBC_OSC_Error ("Error in MPI_try_get(%lu, %i, %p, %i, %i, %p, %i, %lu) (%i)",
-                       (unsigned long)buf1,
-                       trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target,
-                       trygetargs.target_count, trygetargs.target_datatype,  handle->tag,
-                       (unsigned long)handle->comm, res);
-
+                            (unsigned long)buf1,
+                            trygetargs.origin_count, trygetargs.origin_datatype, trygetargs.target,
+                            trygetargs.target_count, trygetargs.target_datatype,  handle->tag,
+                            (unsigned long)handle->comm, res);
             return res;
           }
         }else{
-
+          
           return res;
         }
       }
@@ -807,11 +822,14 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
     handle->req_array = tmp;
 
     res = MCA_PML_CALL(isend(buf1, sendargs.count, sendargs.datatype, sendargs.dest, handle->tag,
-                             MCA_PML_BASE_SEND_STANDARD, sendargs.local?handle->comm->c_local_comm:handle->comm,
+                             MCA_PML_BASE_SEND_STANDARD,
+                             sendargs.local?handle->comm->c_local_comm:handle->comm,
                              handle->req_array+handle->req_count - 1));
     if (OMPI_SUCCESS != res) {
-      PNBC_OSC_Error ("Error in MPI_Isend(%lu, %i, %p, %i, %i, %lu) (%i)", (unsigned long)buf1, sendargs.count,
-                 sendargs.datatype, sendargs.dest, handle->tag, (unsigned long)handle->comm, res);
+      PNBC_OSC_Error ("Error in MPI_Isend(%lu, %i, %p, %i, %i, %lu) (%i)",
+                      (unsigned long)buf1, sendargs.count,
+                      sendargs.datatype, sendargs.dest, handle->tag, (unsigned long)handle->comm,
+                      res);
       return res;
     }
 #ifdef PNBC_OSC_TIMING
@@ -821,8 +839,9 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
   case RECV:
     PNBC_OSC_DEBUG(5, "  RECV (offset %li) ", offset);
     PNBC_OSC_GET_BYTES(ptr,recvargs);
-    PNBC_OSC_DEBUG(5, "*buf: %p, count: %i, type: %p, source: %i, tag: %i)\n", recvargs.buf, recvargs.count,
-              recvargs.datatype, recvargs.source, handle->tag);
+    PNBC_OSC_DEBUG(5, "*buf: %p, count: %i, type: %p, source: %i, tag: %i)\n",
+                   recvargs.buf, recvargs.count,
+                   recvargs.datatype, recvargs.source, handle->tag);
     /* get an additional request - TODO: req_count NOT thread safe */
     handle->req_count++;
     /* get buffer */
@@ -834,7 +853,8 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
 #ifdef PNBC_OSC_TIMING
     Irecv_time -= MPI_Wtime();
 #endif
-    tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count * sizeof (MPI_Request));
+    tmp = (MPI_Request *) realloc ((void *) handle->req_array, handle->req_count *
+                                   sizeof (MPI_Request));
     if (NULL == tmp) {
       return OMPI_ERR_OUT_OF_RESOURCE;
     }
