@@ -36,7 +36,7 @@ BEGIN_C_DECLS
 /*********************** LibPNBC_OSC tuning parameters ************************/
 
 /* the debug level */
-#define PNBC_OSC_DLEVEL 1
+#define PNBC_OSC_DLEVEL 10
 
 /* enable schedule caching - undef PNBC_OSC_CACHE_SCHEDULE to deactivate it */
 /* TODO: this whole schedule cache stuff does not work with the tmbuf
