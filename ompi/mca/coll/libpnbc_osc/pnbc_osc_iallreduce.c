@@ -115,14 +115,17 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
     return res;
   }
   
-  /* Attach window to sendbuf */
+  /* Attach window to tmp sendbuf */
   res = win->w_osc_module->osc_win_attach(win, tmpsbuf, count*size);
-  PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] Attach MPI Window dynamic - OK \n");
+  PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d attaches dynamic window of size %d\n",
+                 rank, count*size);
   
   /* MPI Get_address  */
-  MPI_Get_address (sendbuf, &disp);
-
-  /* create an array of displacements */
+  MPI_Get_address (tmpsbuf, &disp);
+  PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d gets address at disp %d\n",
+               rank, disp);
+  
+  /* create an array of displacements where all ranks will gather the value*/
   disp_a = (MPI_Aint*)malloc(count * sizeof(MPI_Aint));
 
   /* Gather ALL displacements-> pt2pt call */
@@ -365,7 +368,8 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
         }
         /* add value to my values in my window - i.e. add the values and store them in sendbuf
            so they can be use in the next r iteration */
-        res = PNBC_OSC_Sched_op (recvbuf, false, sendbuf, false, count, datatype, op, schedule, true);
+        res = PNBC_OSC_Sched_op (recvbuf, false, sendbuf, false, count, datatype, op, schedule,
+                                 true);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
