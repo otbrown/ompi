@@ -161,9 +161,11 @@ int PNBC_OSC_Sched_put (const void* buf, char tmpbuf, int origin_count, MPI_Data
 
 /* this function puts a get into the schedule */
 static int PNBC_OSC_Sched_get_internal (const void* buf, char tmpbuf, int origin_count,
-                                   MPI_Datatype origin_datatype, int target, int target_count,
-                                   MPI_Datatype target_datatype, bool local, PNBC_OSC_Schedule *schedule,
-                                   bool barrier) {
+                                        MPI_Datatype origin_datatype, int target,
+                                        MPI_Aint target_disp, int target_count,
+                                        MPI_Datatype target_datatype, bool local,
+                                        PNBC_OSC_Schedule *schedule,
+                                        bool barrier) {
   PNBC_OSC_Args_get get_args;
   int ret;
 
@@ -174,10 +176,11 @@ static int PNBC_OSC_Sched_get_internal (const void* buf, char tmpbuf, int origin
   get_args.origin_count = origin_count;
   get_args.origin_datatype = origin_datatype;
   get_args.target = target;
+  get_args.target_disp = target_disp;
   get_args.target_count = target_count;
   get_args.target_datatype = target_datatype;
   get_args.local = local;
-
+  
   /* append to the round-schedule */
   ret = nbc_schedule_round_append (schedule, &get_args, sizeof (get_args), barrier);
   if (OMPI_SUCCESS != ret) {
@@ -189,19 +192,24 @@ static int PNBC_OSC_Sched_get_internal (const void* buf, char tmpbuf, int origin
   return OMPI_SUCCESS;
 }
 
-int PNBC_OSC_Sched_get (const void* buf, char tmpbuf, int origin_count, MPI_Datatype origin_datatype,
-                   int target, int target_count,  MPI_Datatype target_datatype,
-                   PNBC_OSC_Schedule *schedule, bool barrier) {
-  return PNBC_OSC_Sched_get_internal (buf, tmpbuf, origin_count, origin_datatype, target, target_count,
-                                 target_datatype, false, schedule, barrier);
+int PNBC_OSC_Sched_get (const void* buf, char tmpbuf, int origin_count,
+                        MPI_Datatype origin_datatype, int target,
+                        MPI_Aint target_disp, int target_count,
+                        MPI_Datatype target_datatype, PNBC_OSC_Schedule *schedule,
+                        bool barrier) {
+  
+  return PNBC_OSC_Sched_get_internal (buf, tmpbuf, origin_count, origin_datatype, target,
+                                      target_disp, target_count, target_datatype, false,
+                                      schedule, barrier);
 }
 
 /* this function puts a get into the schedule */
 static int PNBC_OSC_Sched_try_get_internal (const void* buf, char tmpbuf, int origin_count,
-                                       MPI_Datatype origin_datatype, int target, int target_count,
-                                       MPI_Datatype target_datatype, bool local,
-                                       PNBC_OSC_Schedule *schedule, int lock_type, int assert,
-                                       bool barrier) {
+                                            MPI_Datatype origin_datatype, int target,
+                                            MPI_Aint target_disp, int target_count,
+                                            MPI_Datatype target_datatype, bool local,
+                                            PNBC_OSC_Schedule *schedule, int lock_type,
+                                            int assert, bool barrier) {
   PNBC_OSC_Args_try_get try_get_args;
   int ret;
 
@@ -212,6 +220,7 @@ static int PNBC_OSC_Sched_try_get_internal (const void* buf, char tmpbuf, int or
   try_get_args.origin_count = origin_count;
   try_get_args.origin_datatype = origin_datatype;
   try_get_args.target = target;
+  try_get_args.target_disp = target_disp;
   try_get_args.target_count = target_count;
   try_get_args.target_datatype = target_datatype;
   try_get_args.local = local;
@@ -231,12 +240,13 @@ static int PNBC_OSC_Sched_try_get_internal (const void* buf, char tmpbuf, int or
 }
 
 int PNBC_OSC_Sched_try_get (const void* buf, char tmpbuf, int origin_count,
-                            MPI_Datatype origin_datatype, int target, int target_count,
+                            MPI_Datatype origin_datatype, int target,
+                            MPI_Aint target_disp, int target_count,
                             MPI_Datatype target_datatype, PNBC_OSC_Schedule *schedule,
                             int lock_type, int assert, bool barrier) {
   return PNBC_OSC_Sched_try_get_internal (buf, tmpbuf, origin_count, origin_datatype, target,
-                                          target_count, target_datatype, false, schedule,
-                                          lock_type, assert, barrier);
+                                          target_disp, target_count, target_datatype, false,
+                                          schedule, lock_type, assert, barrier);
 }
 
 /* this function puts a send into the schedule */
@@ -756,7 +766,8 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
           trygetargs.lock_status = LOCKED;
           res = handle->win->w_osc_module->osc_get(buf1, trygetargs.origin_count,
                                                    trygetargs.origin_datatype,
-                                                   trygetargs.target, 0, trygetargs.target_count,
+                                                   trygetargs.target ,trygetargs.target_disp,
+                                                   trygetargs.target_count,
                                                    trygetargs.target_datatype, handle->win);
           if (OMPI_SUCCESS != res){
             /* return error code */
