@@ -31,8 +31,8 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
                                     PNBC_OSC_Schedule *schedule, void *tmpbuf);
 static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype datatype,
                                         ptrdiff_t gap, void *sendbuf, void *recvbuf, MPI_Op op,
-                                        char inplace, PNBC_OSC_Schedule *schedule, void *tmpbuf,
-                                        ompi_request_t ** request);
+                                        MPI_Aint* disp_a, char inplace, PNBC_OSC_Schedule *schedule,
+                                        void *tmpbuf, ompi_request_t ** request);
 static inline int allred_sched_ring(int rank, int p, int count, MPI_Datatype datatype,
                                     const void *sendbuf, void *recvbuf, MPI_Op op, int size,
                                     int ext, PNBC_OSC_Schedule *schedule, void *tmpbuf);
@@ -176,8 +176,8 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
                               schedule, tmpbuf);
       break;
     case PNBC_OSC_ARED_BINOMIAL_RMA:
-      res = allred_sched_diss_rma(rank, p, count, datatype, gap, tmpsbuf, recvbuf, op, inplace,
-                                  schedule, tmpbuf, request);
+      res = allred_sched_diss_rma(rank, p, count, datatype, gap, tmpsbuf, recvbuf, op, disp_a,
+                                  inplace, schedule, tmpbuf, request);
       break;
     case PNBC_OSC_ARED_REDSCAT_ALLGATHER:
       res = allred_sched_redscat_allgather(rank, p, count, datatype, gap, sendbuf, recvbuf,
@@ -336,10 +336,12 @@ int ompi_coll_libpnbc_osc_iallreduce_inter(const void* sendbuf, void* recvbuf, i
     if (vrank == 0) rank = root;                \
     if (vrank == root) rank = 0;                \
   }
+
 static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype datatype,
                                         ptrdiff_t gap, void *sendbuf, void *recvbuf,
-                                        MPI_Op op, char inplace, PNBC_OSC_Schedule *schedule,
-                                        void *tmpbuf, ompi_request_t **request) {
+                                        MPI_Op op, MPI_Aint* disp_a, char inplace,
+                                        PNBC_OSC_Schedule *schedule, void *tmpbuf,
+                                        ompi_request_t **request) {
   int root, vrank, maxr, vpeer, peer, res;
 
   int assert = 0;
@@ -357,8 +359,8 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
       VRANK2RANK(peer, vpeer, root);
       if (peer < p) {
         /* get the data from my peer and store it in recvbuf*/
-        res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype,
-                                 schedule, lock_type, assert, true);
+        res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, disp_a[peer],
+                                      count, datatype, schedule, lock_type, assert, true);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
@@ -386,8 +388,8 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
       if ((vrank >= (1 << r)) && (vrank < (1 << (r + 1)))) {
         VRANK2RANK(peer, vrank - (1 << r), root);
         /* try_get and place in recvbuf*/
-        res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, count, datatype,
-                                 schedule, lock_type, assert, true);
+        res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, disp_a[peer],
+                                      count, datatype, schedule, lock_type, assert, true);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }

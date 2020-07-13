@@ -121,6 +121,7 @@ extern "C" {
     const void *buf;
     MPI_Datatype origin_datatype;
     MPI_Datatype target_datatype;
+    MPI_Aint target_disp;
     int target;
     char tmpbuf;
     bool local;
@@ -133,6 +134,7 @@ extern "C" {
     const void *buf;
     MPI_Datatype origin_datatype;
     MPI_Datatype target_datatype;
+    MPI_Aint target_disp;
     int target;
     char tmpbuf;
     bool local;
@@ -212,7 +214,8 @@ extern "C" {
   /* Get */
   int PNBC_OSC_Sched_get (const void* buf, char tmpbuf, int origin_count,
                           MPI_Datatype origin_datatype, int target,
-                          int target_count,  MPI_Datatype target_datatype,
+                          MPI_Aint target_disp, int target_count,
+                          MPI_Datatype target_datatype,
                           PNBC_OSC_Schedule *schedule, bool barrier);
   int PNBC_OSC_Sched_local_get (const void* buf, char tmpbuf, int origin_count,
                                 MPI_Datatype origin_datatype, int target,
@@ -220,7 +223,8 @@ extern "C" {
   /* try_get */
   int PNBC_OSC_Sched_try_get (const void* buf, char tmpbuf, int origin_count,
                               MPI_Datatype origin_datatype, int target,
-                              int target_count,  MPI_Datatype target_datatype,
+                              MPI_Aint target_disp, int target_count,
+                              MPI_Datatype target_datatype,
                               PNBC_OSC_Schedule *schedule, int lock_type,
                               int assert, bool barrier);
   int PNBC_OSC_Sched_send (const void* buf, char tmpbuf, int count,
