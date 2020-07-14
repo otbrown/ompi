@@ -696,9 +696,9 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
     case GET:
       PNBC_OSC_DEBUG(5,"  GET (offset %li) ", offset);
       PNBC_OSC_GET_BYTES(ptr,getargs);
-      PNBC_OSC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n",
-                getargs.buf, getargs.origin_count, getargs.origin_datatype, getargs.target,
-                getargs.target_count, getargs.target_datatype, handle->tag);
+      PNBC_OSC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target disp: %i, target count: %i, target type: %p, tag: %i)\n",
+                     getargs.buf, getargs.origin_count, getargs.origin_datatype, getargs.target,
+                     getargs.target_count, getargs.target_datatype, handle->tag);
       /* get an additional request */
       handle->req_count++;
       /* get buffer */
@@ -720,7 +720,8 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
       handle->req_array = tmp;
 
       res = handle->win->w_osc_module->osc_get(buf1, getargs.origin_count, getargs.origin_datatype,
-                                               getargs.target, 0, getargs.target_count,
+                                               getargs.target, getargs.target_disp,
+                                               getargs.target_count,
                                                getargs.target_datatype, handle->win);
 
       if (OMPI_SUCCESS != res) {
