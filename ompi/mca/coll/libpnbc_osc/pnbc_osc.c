@@ -740,10 +740,10 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
     case TRY_GET:
       PNBC_OSC_DEBUG(10,"  TRY_GET (offset %li) ", offset);
       PNBC_OSC_GET_BYTES(ptr,trygetargs);
-      PNBC_OSC_DEBUG(10,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, tag: %i)\n",
+      PNBC_OSC_DEBUG(10,"*buf: %p, origin count: %i, origin type: %p, target: %i, target disp: %i, target count: %i, target type: %p, tag: %i)\n",
                      trygetargs.buf, trygetargs.origin_count, trygetargs.origin_datatype,
-                     trygetargs.target, trygetargs.target_count, trygetargs.target_datatype,
-                     handle->tag);
+                     trygetargs.target, trygetargs.target_disp, trygetargs.target_count,
+                     trygetargs.target_datatype, handle->tag);
 
       /* get an additional request */
       handle->req_count++;
@@ -1088,8 +1088,9 @@ int PNBC_OSC_Schedule_request(PNBC_OSC_Schedule *schedule, ompi_communicator_t *
 }
 
 int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator_t *comm,
-                             ompi_win_t *win, ompi_coll_libpnbc_osc_module_t *module,
-                             bool persistent, ompi_request_t **request, void *tmpbuf) {
+                                  ompi_win_t *win,ompi_win_t *winflag,
+                                  ompi_coll_libpnbc_osc_module_t *module,
+                                  bool persistent, ompi_request_t **request, void *tmpbuf) {
   int ret, tmp_tag;
   bool need_register = false;
   ompi_coll_libpnbc_osc_request_t *handle;
@@ -1128,7 +1129,7 @@ int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator
   handle->row_offset = 0;
   handle->nbc_complete = persistent ? true : false;
   handle->win = win;
-
+  handle->winflag = winflag;
   /******************** Do the tag and shadow comm administration ...  ***************/
 
   OPAL_THREAD_LOCK(&module->mutex);

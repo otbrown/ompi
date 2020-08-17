@@ -257,7 +257,8 @@ extern "C" {
                                 ompi_coll_libpnbc_osc_module_t *module, bool persistent,
                                 ompi_request_t **request, void *tmpbuf);
   int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator_t *comm,
-                                    ompi_win_t *win, ompi_coll_libpnbc_osc_module_t *module,
+                                    ompi_win_t *win,ompi_win_t *winflag,
+                                    ompi_coll_libpnbc_osc_module_t *module,
                                     bool persistent, ompi_request_t **request, void *tmpbuf);
   
   void PNBC_OSC_Return_handle(ompi_coll_libpnbc_osc_request_t *request);
