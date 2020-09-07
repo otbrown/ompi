@@ -123,6 +123,7 @@ struct ompi_coll_libpnbc_osc_request_t {
     PNBC_OSC_Comminfo *comminfo;
     PNBC_OSC_Schedule *schedule;
     MPI_Win win;
+    MPI_Win winflag;
     void *tmpbuf; /* temporary buffer e.g. used for Reduce */
     /* TODO: we should make a handle pointer to a state later (that the user
      * can move request handles) */

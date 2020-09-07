@@ -32,7 +32,7 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
 static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype datatype,
                                         ptrdiff_t gap, void *sendbuf, void *recvbuf, MPI_Op op,
                                         MPI_Aint* disp_a, char inplace, PNBC_OSC_Schedule *schedule,
-                                        void *tmpbuf, ompi_request_t ** request);
+                                        void *tmpbuf, int *getready, ompi_request_t ** request);
 static inline int allred_sched_ring(int rank, int p, int count, MPI_Datatype datatype,
                                     const void *sendbuf, void *recvbuf, MPI_Op op, int size,
                                     int ext, PNBC_OSC_Schedule *schedule, void *tmpbuf);
@@ -56,11 +56,12 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
   ptrdiff_t ext, lb;
   PNBC_OSC_Schedule *schedule;
   size_t size;
-  ompi_win_t *win;
+  ompi_win_t *win, *winflag;
   struct ompi_info_t * info = &ompi_mpi_info_null.info;
   enum { PNBC_OSC_ARED_BINOMIAL, PNBC_OSC_ARED_RING, PNBC_OSC_ARED_REDSCAT_ALLGATHER,
          PNBC_OSC_ARED_BINOMIAL_RMA } alg;
   char inplace;
+  int getready;
   void *tmpbuf = NULL;
   void *tmpsbuf = NULL;
   ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
@@ -105,8 +106,15 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
   /* make a copy of the send buffer - we now have a writable send buffer */
   tmpsbuf = malloc(size*count);
   memcpy(tmpsbuf, sendbuf, size*count);
-
-  /* create an MPI dynamic Window */
+  
+ /* create a window for notification purposes */
+  res = ompi_win_create(&getready, sizeof(int), 0, comm, &info->super, &winflag);
+  if (OMPI_SUCCESS != res) {
+    PNBC_OSC_Error ("MPI Error in win_create (%i)", res);
+    return res;
+  }
+  
+  /* create a dynamic window - data will be stored here */
   res = ompi_win_create_dynamic(&info->super, comm, &win);
   if (OMPI_SUCCESS != res) {
     PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
@@ -177,7 +185,7 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
       break;
     case PNBC_OSC_ARED_BINOMIAL_RMA:
       res = allred_sched_diss_rma(rank, p, count, datatype, gap, tmpsbuf, recvbuf, op, disp_a,
-                                  inplace, schedule, tmpbuf, request);
+                                  inplace, schedule, tmpbuf, &getready, request);
       break;
     case PNBC_OSC_ARED_REDSCAT_ALLGATHER:
       res = allred_sched_redscat_allgather(rank, p, count, datatype, gap, sendbuf, recvbuf,
@@ -203,15 +211,15 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
     return res;
   }
 
-  res = PNBC_OSC_Schedule_request_win(schedule, comm, win, libpnbc_osc_module, persistent,
+  res = PNBC_OSC_Schedule_request_win(schedule, comm, win, winflag, libpnbc_osc_module, persistent,
                                       request, tmpbuf);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     OBJ_RELEASE(schedule);
     free(tmpbuf);
     return res;
   }
-
-return OMPI_SUCCESS;
+  
+  return OMPI_SUCCESS;
 }
 
 
@@ -341,11 +349,12 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
                                         ptrdiff_t gap, void *sendbuf, void *recvbuf,
                                         MPI_Op op, MPI_Aint* disp_a, char inplace,
                                         PNBC_OSC_Schedule *schedule, void *tmpbuf,
-                                        ompi_request_t **request) {
+                                        int* gready, ompi_request_t **request) {
   int root, vrank, maxr, vpeer, peer, res;
-
+  ompi_win_t *winflag;
+  int getaccess = 0;
   int assert = 0;
-  int lock_type = MPI_LOCK_SHARED;
+  int lock_type = MPI_LOCK_EXCLUSIVE;
   root = 0; /* this makes the code for ireduce and iallreduce nearly identical 
                - could be changed to improve performance */
   RANK2VRANK(rank, vrank, root);
@@ -358,9 +367,20 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
       vpeer = vrank + (1 << (r - 1));
       VRANK2RANK(peer, vpeer, root);
       if (peer < p) {
+
+        //do {
+        /* check if children are ready to give data */
+        /* res = PNBC_OSC_Sched_try_get (&getaccess, false, 1, MPI_INT, peer, 0, */
+        /*                               1, MPI_INT, schedule, lock_type, assert, true, false); */
+        /* if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { */
+        /*   return res; */
+        /* } */
+        //}while (1 != getaccess);
+        
         /* get the data from my peer and store it in recvbuf*/
         res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, disp_a[peer],
-                                      count, datatype, schedule, lock_type, assert, true);
+                                      count, datatype, schedule, lock_type, assert, false, false);
+        
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
@@ -376,6 +396,12 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
           return res;
         }
       }
+    }else{
+
+      /* I do not have any more children so, I am get-ready */
+      *gready = 1;
+      
+      break;
     }
   }
   
@@ -389,7 +415,7 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
         VRANK2RANK(peer, vrank - (1 << r), root);
         /* try_get and place in recvbuf*/
         res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, disp_a[peer],
-                                      count, datatype, schedule, lock_type, assert, true);
+                                      count, datatype, schedule, lock_type, assert, true, false);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
@@ -420,7 +446,8 @@ static inline int allred_sched_diss(int rank, int p, int count, MPI_Datatype dat
   char *rbuf, *lbuf, *buf;
   int tmprbuf, tmplbuf;
 
-  root = 0; /* this makes the code for ireduce and iallreduce nearly identical - could be changed to improve performance */
+  root = 0; /* this makes the code for ireduce and iallreduce nearly identical -
+               could be changed to improve performance */
   RANK2VRANK(rank, vrank, root);
   maxr = (int)ceil((log((double)p)/LOG2));
   /* ensure the result ends up in recvbuf on vrank 0 */
