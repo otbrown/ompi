@@ -125,6 +125,8 @@ extern "C" {
     int target;
     char tmpbuf;
     bool local;
+    int lock_type;
+    PNBC_OSC_Lock_status lock_status;
   } PNBC_OSC_Args_get;
 
   typedef struct {
@@ -141,6 +143,7 @@ extern "C" {
     int lock_type;
     int assert;
     PNBC_OSC_Lock_status lock_status;
+    bool notify;
   } PNBC_OSC_Args_try_get;
 
   /* the send argument struct */
@@ -216,7 +219,7 @@ extern "C" {
                           MPI_Datatype origin_datatype, int target,
                           MPI_Aint target_disp, int target_count,
                           MPI_Datatype target_datatype,
-                          PNBC_OSC_Schedule *schedule, bool barrier);
+                          PNBC_OSC_Schedule *schedule, int lock_type, bool barrier);
   int PNBC_OSC_Sched_local_get (const void* buf, char tmpbuf, int origin_count,
                                 MPI_Datatype origin_datatype, int target,
                                 PNBC_OSC_Schedule *schedule, bool barrier);
@@ -226,7 +229,7 @@ extern "C" {
                               MPI_Aint target_disp, int target_count,
                               MPI_Datatype target_datatype,
                               PNBC_OSC_Schedule *schedule, int lock_type,
-                              int assert, bool barrier);
+                              int assert, bool notify, bool barrier);
   int PNBC_OSC_Sched_send (const void* buf, char tmpbuf, int count,
                            MPI_Datatype datatype, int dest,
                            PNBC_OSC_Schedule *schedule, bool barrier);

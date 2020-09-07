@@ -354,7 +354,7 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
   ompi_win_t *winflag;
   int getaccess = 0;
   int assert = 0;
-  int lock_type = MPI_LOCK_SHARED;
+  int lock_type = MPI_LOCK_EXCLUSIVE;
   root = 0; /* this makes the code for ireduce and iallreduce nearly identical 
                - could be changed to improve performance */
   RANK2VRANK(rank, vrank, root);
@@ -369,18 +369,18 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
       VRANK2RANK(peer, vpeer, root);
       if (peer < p) {
 
-        do {
-          /* check if children are ready to give data */
-          res = PNBC_OSC_Sched_try_get (&getaccess, false, 1, MPI_INT, peer, 0,
-                                        1, MPI_INT, schedule, lock_type, assert, true);
-          if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-            return res;
-          }
-        }while (1 != getaccess);
+        //do {
+        /* check if children are ready to give data */
+        res = PNBC_OSC_Sched_try_get (&getaccess, false, 1, MPI_INT, peer, 0,
+                                      1, MPI_INT, schedule, lock_type, assert, true, false);
+        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+          return res;
+        }
+        //}while (1 != getaccess);
         
         /* get the data from my peer and store it in recvbuf*/
         res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, disp_a[peer],
-                                      count, datatype, schedule, lock_type, assert, true);
+                                      count, datatype, schedule, lock_type, assert, false, false);
         
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
@@ -416,7 +416,7 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
         VRANK2RANK(peer, vrank - (1 << r), root);
         /* try_get and place in recvbuf*/
         res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, disp_a[peer],
-                                      count, datatype, schedule, lock_type, assert, true);
+                                      count, datatype, schedule, lock_type, assert, true, false);
         if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
           return res;
         }
