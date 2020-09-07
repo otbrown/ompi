@@ -360,7 +360,6 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
   RANK2VRANK(rank, vrank, root);
   maxr = (int)ceil((log((double)p)/LOG2));
 
-  *gready = 0; 
   
   for (int r = 1; r <= maxr ; ++r) {
     if ((vrank % (1 << r)) == 0) {
@@ -371,11 +370,11 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
 
         //do {
         /* check if children are ready to give data */
-        res = PNBC_OSC_Sched_try_get (&getaccess, false, 1, MPI_INT, peer, 0,
-                                      1, MPI_INT, schedule, lock_type, assert, true, false);
-        if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-          return res;
-        }
+        /* res = PNBC_OSC_Sched_try_get (&getaccess, false, 1, MPI_INT, peer, 0, */
+        /*                               1, MPI_INT, schedule, lock_type, assert, true, false); */
+        /* if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { */
+        /*   return res; */
+        /* } */
         //}while (1 != getaccess);
         
         /* get the data from my peer and store it in recvbuf*/
