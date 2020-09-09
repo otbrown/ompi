@@ -102,12 +102,12 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
   if (OPAL_UNLIKELY(NULL == tmpbuf)) {
     return OMPI_ERR_OUT_OF_RESOURCE;
   }
-  
+
   /* make a copy of the send buffer - we now have a writable send buffer */
   tmpsbuf = malloc(size*count);
   memcpy(tmpsbuf, sendbuf, size*count);
-  
- /* create a window for notification purposes */
+
+  /* create a window for notification purposes */
   res = ompi_win_create(&getready, sizeof(int), 0, comm, &info->super, &winflag);
   if (OMPI_SUCCESS != res) {
     PNBC_OSC_Error ("MPI Error in win_create (%i)", res);
@@ -125,7 +125,7 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
   
   /* Attach window to tmp sendbuf */
   res = win->w_osc_module->osc_win_attach(win, tmpsbuf, count*size);
-  PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d attaches dynamic window of size %d\n",
+  PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d attaches dynamic window of size %d bytes\n",
                  rank, count*size);
   
   /* MPI Get_address  */
@@ -134,11 +134,11 @@ static int pnbc_osc_allreduce_init(const void* sendbuf, void* recvbuf, int count
                rank, disp);
   
   /* create an array of displacements where all ranks will gather the value*/
-  disp_a = (MPI_Aint*)malloc(count * sizeof(MPI_Aint));
+  disp_a = (MPI_Aint*)malloc(p * sizeof(MPI_Aint));
 
   /* Gather ALL displacements-> pt2pt call */
 
-  res = comm->c_coll->coll_allgather(&disp, 1, MPI_INT, disp_a, count, MPI_INT, comm,
+  res = comm->c_coll->coll_allgather(&disp, count, MPI_AINT, disp_a, count, MPI_AINT, comm,
                                      comm->c_coll->coll_allgather_module);
   if (OMPI_SUCCESS != res) {
     PNBC_OSC_Error ("MPI Error in coll_allgather (%i)", res);
@@ -368,14 +368,11 @@ static inline int allred_sched_diss_rma(int rank, int p, int count, MPI_Datatype
       VRANK2RANK(peer, vpeer, root);
       if (peer < p) {
 
-        //do {
         /* check if children are ready to give data */
         /* res = PNBC_OSC_Sched_try_get (&getaccess, false, 1, MPI_INT, peer, 0, */
         /*                               1, MPI_INT, schedule, lock_type, assert, true, false); */
         /* if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) { */
         /*   return res; */
-        /* } */
-        //}while (1 != getaccess);
         
         /* get the data from my peer and store it in recvbuf*/
         res = PNBC_OSC_Sched_try_get (recvbuf, false, count, datatype, peer, disp_a[peer],
