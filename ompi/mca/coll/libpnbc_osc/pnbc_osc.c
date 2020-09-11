@@ -849,6 +849,69 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
       }
 
       break;
+    case OP:
+      PNBC_OSC_DEBUG(5, "  OP2  (offset %li) ", offset);
+      PNBC_OSC_GET_BYTES(ptr,opargs);
+      PNBC_OSC_DEBUG(5, "*buf1: %p, buf2: %p, count: %i, type: %p)\n", opargs.buf1, opargs.buf2,
+                opargs.count, opargs.datatype);
+      /* get buffers */
+      if(opargs.tmpbuf1) {
+        buf1=(char*)handle->tmpbuf+(long)opargs.buf1;
+      } else {
+        buf1=(void *)opargs.buf1;
+      }
+      if(opargs.tmpbuf2) {
+        buf2=(char*)handle->tmpbuf+(long)opargs.buf2;
+      } else {
+        buf2=opargs.buf2;
+      }
+      ompi_op_reduce(opargs.op, buf1, buf2, opargs.count, opargs.datatype);
+      break;
+    case COPY:
+      PNBC_OSC_DEBUG(5, "  COPY   (offset %li) ", offset);
+      PNBC_OSC_GET_BYTES(ptr,copyargs);
+      PNBC_OSC_DEBUG(5, "*src: %lu, srccount: %i, srctype: %p, *tgt: %lu, tgtcount: %i, tgttype: %p)\n",
+                (unsigned long) copyargs.src, copyargs.srccount, copyargs.srctype,
+                (unsigned long) copyargs.tgt, copyargs.tgtcount, copyargs.tgttype);
+      /* get buffers */
+      if(copyargs.tmpsrc) {
+        buf1=(char*)handle->tmpbuf+(long)copyargs.src;
+      } else {
+        buf1=copyargs.src;
+      }
+      if(copyargs.tmptgt) {
+        buf2=(char*)handle->tmpbuf+(long)copyargs.tgt;
+      } else {
+        buf2=copyargs.tgt;
+      }
+      res = PNBC_OSC_Copy (buf1, copyargs.srccount, copyargs.srctype, buf2, copyargs.tgtcount, copyargs.tgttype,
+                           handle->comm);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+        return res;
+      }
+      break;
+      
+    case UNPACK:
+      PNBC_OSC_DEBUG(5, "  UNPACK   (offset %li) ", offset);
+      PNBC_OSC_GET_BYTES(ptr,unpackargs);
+      PNBC_OSC_DEBUG(5, "*src: %lu, srccount: %i, srctype: %p, *tgt: %lu\n", (unsigned long) unpackargs.inbuf,
+                     unpackargs.count, unpackargs.datatype, (unsigned long) unpackargs.outbuf);
+      /* get buffers */
+      if(unpackargs.tmpinbuf) {
+        buf1=(char*)handle->tmpbuf+(long)unpackargs.inbuf;
+      } else {
+        buf1=unpackargs.inbuf;
+      }
+      if(unpackargs.tmpoutbuf) {
+        buf2=(char*)handle->tmpbuf+(long)unpackargs.outbuf;
+      } else {
+        buf2=unpackargs.outbuf;
+      }
+      res = PNBC_OSC_Unpack (buf1, unpackargs.count, unpackargs.datatype, buf2, handle->comm);
+      if (OMPI_SUCCESS != res) {
+        PNBC_OSC_Error ("NBC_Unpack() failed (code: %i)", res);
+        return res;
+      }
     default:
       PNBC_OSC_Error ("PNBC_OSC_Start_round: bad type %li at offset %li", (long)type, offset);
       return OMPI_ERROR;
