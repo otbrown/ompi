@@ -24,8 +24,9 @@
  *
  * Additional copyrights may follow
  */
-#include "pnbc_osc_schedule.h"
+#include "pnbc_osc_debug.h"
 #include "pnbc_osc_internal.h"
+#include "pnbc_osc_schedule.h"
 
 static void PNBC_OSC_Schedule_constructor (PNBC_OSC_Schedule *schedule) {
   /* initial total size of the schedule */
@@ -289,24 +290,6 @@ int PNBC_OSC_Sched_commit(PNBC_OSC_Schedule *schedule) {
 
   return OMPI_SUCCESS;
 }
-
-/* finishes a request
- *
- * to be called *only* from the progress thread !!! */
-static inline void PNBC_OSC_Free (PNBC_OSC_Handle* handle) {
-
-  if (NULL != handle->schedule) {
-    /* release schedule */
-    OBJ_RELEASE (handle->schedule);
-    handle->schedule = NULL;
-  }
-
-  if (NULL != handle->tmpbuf) {
-    free((void*)handle->tmpbuf);
-    handle->tmpbuf = NULL;
-  }
-}
-
 
 int PNBC_OSC_Schedule_request(PNBC_OSC_Schedule *schedule, ompi_communicator_t *comm,
                               ompi_coll_libpnbc_osc_module_t *module, bool persistent,

@@ -20,6 +20,7 @@
  * Author(s): Daniel Holmes  EPCC, The University of Edinburgh
  *
  */
+#include "pnbc_osc_debug.h"
 #include "pnbc_osc_internal.h"
 #include "pnbc_osc_action_decrement.h"
 #include "pnbc_osc_action_get.h"

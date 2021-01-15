@@ -35,6 +35,7 @@ typedef void
 /* some built-in trigger functions */
 int triggered_all_bynonzero_int(FLAG_t *trigger, void *cbstate);
 int triggered_all_byzero_int(FLAG_t *trigger, void *cbstate);
+int triggered_all_byrequest_flag(FLAG_t *trigger, void *cbstate);
 void reset_all_to_zero_int(FLAG_t *trigger, FLAG_t value);
 enum TRIGGER_ACTION_STATE action_all_noop(void *cbstate);
 

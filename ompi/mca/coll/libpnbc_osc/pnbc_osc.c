@@ -24,6 +24,7 @@
  *
  * Additional copyrights may follow
  */
+#include "pnbc_osc_debug.h"
 #include "pnbc_osc_internal.h"
 #include "ompi/op/op.h"
 #include "ompi/mca/pml/pml.h"
@@ -33,37 +34,28 @@
 /* only used in this file */
 static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle);
 
-/* #define PNBC_OSC_TIMING */
 
-#ifdef PNBC_OSC_TIMING
-static double Iput_time=0,Iget_time=0,Isend_time=0, Irecv_time=0, Wait_time=0, Test_time=0;
-void PNBC_OSC_Reset_times() {
-  Iwfree_time=Iput_time=Iget_time=Isend_time=Irecv_time=Wait_time=Test_time=0;
-}
+int PNBC_OSC_Start(PNBC_OSC_Handle *handle) {
+  int res;
 
-void PNBC_OSC_Print_times(double div) {
-  printf("*** PNBC_OSC_TIMES: Isend: %lf, Irecv: %lf, Wait: %lf, Test: %lf\n",
-         Isend_time*1e6/div, Irecv_time*1e6/div,
-         Wait_time*1e6/div, Test_time*1e6/div);
-}
-#endif
-
-
-/* finishes a request
- *
- * to be called *only* from the progress thread !!! */
-static inline void PNBC_OSC_Free (PNBC_OSC_Handle* handle) {
-
-  if (NULL != handle->schedule) {
-    /* release schedule */
-    OBJ_RELEASE (handle->schedule);
-    handle->schedule = NULL;
+  /* bozo case */
+  if ((ompi_request_t *)handle == &ompi_request_empty) {
+    return OMPI_SUCCESS;
   }
 
-  if (NULL != handle->tmpbuf) {
-    free((void*)handle->tmpbuf);
-    handle->tmpbuf = NULL;
+  /* kick off first round */
+  handle->super.req_state = OMPI_REQUEST_ACTIVE;
+  handle->super.req_status.MPI_ERROR = OMPI_SUCCESS;
+  res = PNBC_OSC_Start_round(handle);
+  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+    return res;
   }
+
+  OPAL_THREAD_LOCK(&mca_coll_libpnbc_osc_component.lock);
+  opal_list_append(&mca_coll_libpnbc_osc_component.active_requests, &(handle->super.super.super));
+  OPAL_THREAD_UNLOCK(&mca_coll_libpnbc_osc_component.lock);
+
+  return OMPI_SUCCESS;
 }
 
 
@@ -621,34 +613,6 @@ static inline int PNBC_OSC_Start_round(PNBC_OSC_Handle *handle) {
       return OMPI_ERROR;
     }
   }
-
-  return OMPI_SUCCESS;
-}
-
-void PNBC_OSC_Return_handle(ompi_coll_libpnbc_osc_request_t *request) {
-  PNBC_OSC_Free (request);
-  OMPI_COLL_LIBPNBC_OSC_REQUEST_RETURN(request);
-}
-
-int PNBC_OSC_Start(PNBC_OSC_Handle *handle) {
-  int res;
-
-  /* bozo case */
-  if ((ompi_request_t *)handle == &ompi_request_empty) {
-    return OMPI_SUCCESS;
-  }
-
-  /* kick off first round */
-  handle->super.req_state = OMPI_REQUEST_ACTIVE;
-  handle->super.req_status.MPI_ERROR = OMPI_SUCCESS;
-  res = PNBC_OSC_Start_round(handle);
-  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-    return res;
-  }
-
-  OPAL_THREAD_LOCK(&mca_coll_libpnbc_osc_component.lock);
-  opal_list_append(&mca_coll_libpnbc_osc_component.active_requests, &(handle->super.super.super));
-  OPAL_THREAD_UNLOCK(&mca_coll_libpnbc_osc_component.lock);
 
   return OMPI_SUCCESS;
 }

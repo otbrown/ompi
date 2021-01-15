@@ -26,9 +26,8 @@
 /* correct fortran bindings */
 #define PNBC_OSC_F77_FUNC_ F77_FUNC_
 
-#include "mpi.h"
+//#include "mpi.h"
 
-#include "coll_libpnbc_osc.h"
 #if OPAL_CUDA_SUPPORT
 #include "opal/datatype/opal_convertor.h"
 #include "opal/datatype/opal_datatype_cuda.h"
@@ -39,12 +38,13 @@
 #include "ompi/communicator/communicator.h"
 #include "ompi/win/win.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <assert.h>
-#include <math.h>
-#include <string.h>
+#include "coll_libpnbc_osc.h"
+#include "pnbc_osc_request.h"
+
+//#include <stdlib.h>
+//#include <assert.h>
+//#include <math.h>
+//#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -210,13 +210,12 @@ int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator
   
 int PNBC_OSC_Start(PNBC_OSC_Handle *handle);
 int PNBC_OSC_Progress(PNBC_OSC_Handle *handle);
+void PNBC_OSC_Free (PNBC_OSC_Handle* handle);
 
 static inline void PNBC_OSC_Reset(PNBC_OSC_Handle *handle) {
   handle->schedule->row_offset = 0;
 }
 
-void PNBC_OSC_Return_handle(ompi_coll_libpnbc_osc_request_t *request);
-  
 static inline int PNBC_OSC_Type_intrinsic(MPI_Datatype type);
 int PNBC_OSC_Create_fortran_handle(int *fhandle, PNBC_OSC_Handle **handle);
   
@@ -408,27 +407,6 @@ int PNBC_OSC_Create_fortran_handle(int *fhandle, PNBC_OSC_Handle **handle);
       ptr += round_size;                                                \
       ptr += sizeof(char); /* barrier delimiter */                      \
     }                                                                   \
-  }
-
-  /*
-    #define PNBC_OSC_DEBUG(level, ...) {}
-  */
-
-  static inline void PNBC_OSC_DEBUG(int level, const char *fmt, ...)
-  {
-#if PNBC_OSC_DLEVEL > 0
-    va_list ap;
-    int rank;
-
-    if(PNBC_OSC_DLEVEL >= level) {
-      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-      printf("[LibPNBC_OSC - %i] ", rank);
-      va_start(ap, fmt);
-      vprintf(fmt, ap);
-      va_end (ap);
-    }
-#endif
   }
 
   /* returns true (1) or false (0) if type is intrinsic or not */
