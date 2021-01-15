@@ -10,6 +10,8 @@ int triggered_all_byzero_int(FLAG_t *trigger, void *cbstate) {
   return !(*(int*)trigger);
 }
 
+int triggered_all_byrequest_flag(FLAG_t *trigger, void *cbstate);
+
 void reset_all_to_zero_int(FLAG_t *trigger, FLAG_t value) {
   *(int*)trigger = 0;
 }
