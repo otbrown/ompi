@@ -21,15 +21,15 @@ int main() {
 
   enum TRIGGER_ACTION_STATE val;
 
-  val = trigger_test(mything); // TRIGGER_PENDING
+  val = trigger_test(&mything); // TRIGGER_PENDING
   printf("After first test (should be %d), val = %d\n", TRIGGER_PENDING, val);
 
   // some reomte action changes state of trigger
   trigger = 23;
 
-  val = trigger_test(mything); // ACTION_SUCCESS
+  val = trigger_test(&mything); // ACTION_SUCCESS
   printf("After second test (should be %d), val = %d\n", ACTION_SUCCESS, val);
 
-  val = trigger_test(mything); // TRIGGER_PENDING
+  val = trigger_test(&mything); // TRIGGER_PENDING
   printf("After third test (should be %d), val = %d\n", TRIGGER_PENDING, val);
 }

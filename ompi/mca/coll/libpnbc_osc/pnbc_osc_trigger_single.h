@@ -15,10 +15,10 @@ struct triggerable_t {
 };
 typedef struct triggerable_t triggerable_t;
 
-void trigger_reset(triggerable_t thing);
+void trigger_reset(triggerable_t *thing);
 
-enum TRIGGER_ACTION_STATE trigger_test(triggerable_t thing);
+enum TRIGGER_ACTION_STATE trigger_test(triggerable_t *thing);
 
-enum TRIGGER_ACTION_STATE trigger_action(triggerable_t thing);
+enum TRIGGER_ACTION_STATE trigger_action(triggerable_t *thing);
 
 #endif
