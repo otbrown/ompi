@@ -38,6 +38,7 @@
 #include "ompi/communicator/communicator.h"
 #include "ompi/win/win.h"
 
+#include "pnbc_osc_debug.h"
 #include "coll_libpnbc_osc.h"
 #include "pnbc_osc_request.h"
 
@@ -221,14 +222,6 @@ int PNBC_OSC_Create_fortran_handle(int *fhandle, PNBC_OSC_Handle **handle);
   
   /* some macros */
   
-  static inline void PNBC_OSC_Error (char *format, ...) {
-    va_list args;
-
-    va_start (args, format);
-    vfprintf (stderr, format, args);
-    fprintf (stderr, "\n");
-    va_end (args);
-  }
 
   /* a schedule has the following format:
    * [schedule] ::= [size][round-schedule][delimiter][round-schedule][delimiter]...[end]
