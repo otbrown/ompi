@@ -2,9 +2,19 @@
 #define PNBC_OSC_ACTION_GET_H
 
 #include "pnbc_osc_trigger_common.h"
+#include "ompi/request/request.h"
+#include "ompi/win/win.h"
 
 struct get_args_t {
-  int temp;
+  MPI_Win win;
+  void *buf;
+  int origin_count;
+  MPI_Datatype origin_datatype;
+  int target;
+  MPI_Aint target_displ;
+  int target_count;
+  MPI_Datatype target_datatype;
+  MPI_Request *request;
 };
 typedef struct get_args_t get_args_t;
 
