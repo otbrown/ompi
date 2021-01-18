@@ -22,9 +22,7 @@
  */
 #include "pnbc_osc_debug.h"
 #include "pnbc_osc_internal.h"
-#include "pnbc_osc_action_decrement.h"
-#include "pnbc_osc_action_get.h"
-#include "pnbc_osc_action_put.h"
+#include "pnbc_osc_action_common.h"
 
 static inline int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                               MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
@@ -344,10 +342,10 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   MPI_Request **requests_moveData = &(schedule->requests[1 * csize * sizeof(MPI_Request*)]); // combine into PUT_NOTIFY?
   MPI_Request **requests_rputDONE = &(schedule->requests[2 * csize * sizeof(MPI_Request*)]); // combine into PUT_NOTIFY?
 
-  schedule->action_args_list = malloc(3 * csize * sizeof(put_args_t));
-  put_args_t *action_args_FLAG = &(schedule->action_args_list[0 * csize * sizeof(put_args_t)]); // TODO:should be polymorphic args
-  put_args_t *action_args_DATA = &(schedule->action_args_list[1 * csize * sizeof(put_args_t)]); // TODO:should be polymorphic args
-  put_args_t *action_args_DONE = &(schedule->action_args_list[2 * csize * sizeof(put_args_t)]); // TODO:should be polymorphic args
+  schedule->action_args_list = malloc(3 * csize * sizeof(any_args_t));
+  any_args_t *action_args_FLAG = &(schedule->action_args_list[0 * csize * sizeof(any_args_t)]);
+  any_args_t *action_args_DATA = &(schedule->action_args_list[1 * csize * sizeof(any_args_t)]);
+  any_args_t *action_args_DONE = &(schedule->action_args_list[2 * csize * sizeof(any_args_t)]);
 
   schedule->trigger_arrays = malloc(6 * sizeof(triggerable_array)); // TODO:replace csize*triggerable_single with triggerable_array
 
