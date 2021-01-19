@@ -16,7 +16,8 @@ void trigger_reset_all(triggerable_array *array) {
 
 enum TRIGGER_ACTION_STATE trigger_test_one(triggerable_array *array, int index) {
   enum TRIGGER_ACTION_STATE ret = TRIGGER_PENDING;
-  if (array->test_one(&((*array->triggers)[index]), index, array->test_cbstate)) {
+  ret = array->test_one(&((*array->triggers)[index]), index, array->test_cbstate);
+  if (TRIGGER_PENDING != ret) {
     ret = array->action_one(index, array->action_one_cbstate);
     if (ACTION_SUCCESS == ret) {
       trigger_reset_one(array, index);

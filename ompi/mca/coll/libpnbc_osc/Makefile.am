@@ -33,6 +33,7 @@ sources = \
 	pnbc_osc_request.c \
 	pnbc_osc_schedule.c \
 	pnbc_osc_trigger_array.c \
+	pnbc_osc_trigger_byrequest.c \
 	pnbc_osc_trigger_common.c \
 	pnbc_osc_trigger_single.c \
 	pnbc_osc_internal.h \
