@@ -17,7 +17,7 @@ int main() {
   mything.action = &action_all_noop;
   mything.reset = &reset_all_to_zero_int;
   mything.auto_reset = !0;
-  trigger_reset(mything);
+  trigger_reset(&mything);
 
   enum TRIGGER_ACTION_STATE val;
 

@@ -4,7 +4,6 @@
 #include "pnbc_osc_trigger_common.h"
 
 struct triggerable_array {
-  trigger_test_all_fn_t         test_all;
   trigger_test_one_fn_t         test_one;
   void                         *test_cbstate;
   int                           progress;
