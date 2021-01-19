@@ -21,7 +21,7 @@ int main() {
   myarray.triggers = &flags;
   myarray.test_one = &custom_test_one;
   myarray.action_one = &action_one_noop;
-  myarray.action_one = action_one_put_p;
+  //myarray.action_one = action_one_put_p;
   myarray.reset_one = &reset_one_to_zero_int;
   myarray.auto_reset = !0;
   myarray.action_all = &action_all_noop;
