@@ -193,7 +193,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                        crank, r,
                        (char*)sendbuf+sdispls[r],
                        sdispls[r],
-		       sendext*sendcounts[r],
+                       sendext*sendcounts[r],
                        sendcounts[r]);
 
         // compute displacement of local window memory portion
