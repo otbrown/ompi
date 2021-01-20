@@ -129,77 +129,105 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   crank = ompi_comm_rank(comm);
   csize = ompi_comm_size(comm);
 
-  // ******************************
-  // PUT-BASED WINDOW SETUP - BEGIN
-  // ******************************
+  // TODO [DanH] add code to examine info and decide which algo to use
 
-  // compute absolute displacement as MPI_AINT for the recvbuf pointer
-  res = MPI_Get_address(recvbuf, &base_recvbuf);
-  if (OMPI_SUCCESS != res) {
-    PNBC_OSC_Error ("MPI Error in MPI_Get_address (%i)", res);
-    return res;
-  }
-  abs_recvbuf = MPI_Aint_add(MPI_BOTTOM, base_recvbuf);
+  a2av_sched_algo algo = algo_trigger_push;
 
-  // create an array of displacements where all ranks will gather their window memory base address
-  abs_rdispls_other = (MPI_Aint*)malloc(csize * sizeof(MPI_Aint));
-  if (OPAL_UNLIKELY(NULL == abs_rdispls_other)) {
-    return OMPI_ERR_OUT_OF_RESOURCE;
-  }
-  abs_rdispls_local = (MPI_Aint*)malloc(csize * sizeof(MPI_Aint));
-  if (OPAL_UNLIKELY(NULL == abs_rdispls_local)) {
-    free(abs_rdispls_other);
-    return OMPI_ERR_OUT_OF_RESOURCE;
-  }
+  // END OF DanH changes for info
 
-  // create a dynamic window - data will be received here
+  // create a dynamic window - data here will be accessed by remote processes
   res = ompi_win_create_dynamic(&info->super, comm, &win);
   if (OMPI_SUCCESS != res) {
     PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
-    free(abs_rdispls_other);
-    free(abs_rdispls_local);
     return res;
   }
 
-  // attach all pieces of local recvbuf to local window and record their absolute displacements
-  for (int r=0;r<csize;++r) {
-    res = win->w_osc_module->osc_win_attach(win, (char*)recvbuf+rdispls[r], recvext*recvcounts[r]);
-    if (OMPI_SUCCESS != res) {
-      PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
-      free(abs_rdispls_other);
+
+  switch (algo) {
+    case algo_linear_rput: // ignore
+      break;
+    case algo_linear_rget: // ignore
+      break;
+    case algo_trigger_pull:
+      // uses get to move data from the remote sendbuf - needs sdispls to be exchanged
+
+      // TODO [DanT] exchange sdispls instead of rdispls (copy&paste&modify the code in the next case)
+
+      break;
+    case algo_trigger_push:
+      // uses put to move data into the remote recvbuf - needs rdispls to be exchanged
+
+      // ******************************
+      // PUT-BASED WINDOW SETUP - BEGIN
+      // ******************************
+    
+      // compute absolute displacement as MPI_AINT for the recvbuf pointer
+      res = MPI_Get_address(recvbuf, &base_recvbuf);
+      if (OMPI_SUCCESS != res) {
+        PNBC_OSC_Error ("MPI Error in MPI_Get_address (%i)", res);
+        MPI_Win_free(&win);
+        return res;
+      }
+      abs_recvbuf = MPI_Aint_add(MPI_BOTTOM, base_recvbuf);
+    
+      // create an array of displacements where all ranks will gather their window memory base address
+      abs_rdispls_other = (MPI_Aint*)malloc(csize * sizeof(MPI_Aint));
+      if (OPAL_UNLIKELY(NULL == abs_rdispls_other)) {
+        MPI_Win_free(&win);
+        return OMPI_ERR_OUT_OF_RESOURCE;
+      }
+      abs_rdispls_local = (MPI_Aint*)malloc(csize * sizeof(MPI_Aint));
+      if (OPAL_UNLIKELY(NULL == abs_rdispls_local)) {
+        MPI_Win_free(&win);
+        free(abs_rdispls_other);
+        return OMPI_ERR_OUT_OF_RESOURCE;
+      }
+    
+      // attach all pieces of local recvbuf to local window and record their absolute displacements
+      for (int r=0;r<csize;++r) {
+        res = win->w_osc_module->osc_win_attach(win, (char*)recvbuf+rdispls[r], recvext*recvcounts[r]);
+        if (OMPI_SUCCESS != res) {
+          PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
+          free(abs_rdispls_other);
+          free(abs_rdispls_local);
+          MPI_Win_free(&win);
+          return res;
+        }
+        PNBC_OSC_DEBUG(1, "[pnbc_alltoallv_init] %d attaches to dynamic window memory for rank %d with address %p (computed from rdispl value %d) of size %d bytes (computed from recvcount value %d)\n",
+                       crank, r,
+                       (char*)recvbuf+rdispls[r],
+                       rdispls[r],
+                       recvext*recvcounts[r],
+                       recvcounts[r]);
+    
+        // compute displacement of local window memory portion
+        abs_rdispls_local[r] = MPI_Aint_add(abs_recvbuf, (MPI_Aint)rdispls[r]);
+        PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d gets address at disp %ld\n",
+                       crank, abs_rdispls_local[r]);
+      }
+    
+      // swap local rdispls for remote rdispls
+      // put the displacements for all local portions on the window
+      // get the displacements for all other portions on the window
+      res = comm->c_coll->coll_alltoall(abs_rdispls_local, csize, MPI_AINT,
+                                        abs_rdispls_other, csize, MPI_AINT,
+                                        comm, comm->c_coll->coll_alltoall_module);
+      if (OMPI_SUCCESS != res) {
+        PNBC_OSC_Error ("MPI Error in alltoall for rdispls (%i)", res);
+        free(abs_rdispls_other);
+        free(abs_rdispls_local);
+        MPI_Win_free(&win);
+        return res;
+      }
+    
+      // the local absolute displacement values for portions of recvbuf are only needed remotely
       free(abs_rdispls_local);
-      MPI_Win_free(&win);
-      return res;
-    }
-    PNBC_OSC_DEBUG(1, "[pnbc_alltoallv_init] %d attaches to dynamic window memory for rank %d with address %p (computed from rdispl value %d) of size %d bytes (computed from recvcount value %d)\n",
-                   crank, r,
-                   (char*)recvbuf+rdispls[r],
-                   rdispls[r],
-                   recvext*recvcounts[r],
-                   recvcounts[r]);
+    
+      // ****************************
+      // PUT_BASED WINDOW SETUP - END
+      // ****************************
 
-    // compute displacement of local window memory portion
-    abs_rdispls_local[r] = MPI_Aint_add(abs_recvbuf, (MPI_Aint)rdispls[r]);
-    PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d gets address at disp %ld\n",
-                   crank, abs_rdispls_local[r]);
-  }
-
-  // swap local rdispls for remote rdispls
-  // put the displacements for all local portions on the window
-  // get the displacements for all other portions on the window
-  res = comm->c_coll->coll_alltoall(abs_rdispls_local, csize, MPI_AINT,
-                                    abs_rdispls_other, csize, MPI_AINT,
-                                    comm, comm->c_coll->coll_alltoall_module);
-  if (OMPI_SUCCESS != res) {
-    PNBC_OSC_Error ("MPI Error in alltoall for rdispls (%i)", res);
-    free(abs_rdispls_other);
-    free(abs_rdispls_local);
-    MPI_Win_free(&win);
-    return res;
-  }
-
-  // the local absolute displacement values for portions of recvbuf are only needed remotely
-  free(abs_rdispls_local);
+  } // end switch (algo)
 
   res = MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
   if (OMPI_SUCCESS != res) {
@@ -210,11 +238,6 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
     return res;
   }
 
-  // ****************************
-  // PUT_BASED WINDOW SETUP - END
-  // ****************************
-
-  a2av_sched_algo algo = algo_trigger_push;
   switch (algo) {
     case algo_linear_rput:
   res = a2av_sched_linear_rput(crank, csize, schedule, flags, &fsize, &req_count,
