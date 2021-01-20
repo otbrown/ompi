@@ -39,7 +39,7 @@ PNBC_OSC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, targe
 
 trigger_action_all_cb_fn_t action_all_put_p = (trigger_action_all_cb_fn_t)action_all_put;
 
-static enum TRIGGER_ACTION_STATE action_one_put(put_args_t *put args) {
+static enum TRIGGER_ACTION_STATE action_one_put(put_args_t *put_args) {
   return action_all_put(put_args);
 }
 
