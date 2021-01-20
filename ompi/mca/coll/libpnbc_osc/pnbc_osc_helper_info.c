@@ -49,7 +49,7 @@ bool check_config_value_equal(char *key, ompi_info_t *info, char *value) {
     return result;
 
  info_not_found:
-    param = mca_base_var_find("ompi", "coll", "libpnbcs_osc", key);
+    param = mca_base_var_find("ompi", "coll", "libpnbc_osc", key);
     if (0 > param) return false;
 
     ret = mca_base_var_get_value(param, &flag_value, NULL, NULL);
@@ -59,4 +59,3 @@ bool check_config_value_equal(char *key, ompi_info_t *info, char *value) {
 
     return result;
 }
-
