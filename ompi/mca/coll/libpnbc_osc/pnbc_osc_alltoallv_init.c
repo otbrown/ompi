@@ -23,6 +23,7 @@
 #include "pnbc_osc_debug.h"
 #include "pnbc_osc_internal.h"
 #include "pnbc_osc_action_common.h"
+#include "pnbc_osc_helper_info.h"
 
 static inline int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                               MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
@@ -132,6 +133,11 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   // TODO [DanH] add code to examine info and decide which algo to use
 
   a2av_sched_algo algo = algo_trigger_push;
+
+  if ( check_config_value_equal("a2av_algo_requested", info, "linear_trigger_pull") )
+    algo = algo_trigger_pull;
+  if ( check_config_value_equal("a2av_algo_requested", info, "linear_trigger_push") )
+    algo = algo_trigger_push;
 
   // END OF DanH changes for info
 

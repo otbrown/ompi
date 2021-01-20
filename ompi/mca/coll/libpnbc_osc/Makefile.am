@@ -30,6 +30,7 @@ sources = \
 	pnbc_osc_action_get.c \
 	pnbc_osc_action_put.c \
 	pnbc_osc_debug.c \
+	pnbc_osc_helper_info.c \
 	pnbc_osc_request.c \
 	pnbc_osc_schedule.c \
 	pnbc_osc_trigger_array.c \
