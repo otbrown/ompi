@@ -208,7 +208,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                        crank, abs_sdispls_local[r]);
       }
 
-      // swap local rdispls for remote rdispls
+      // swap local sdispls for remote sdispls
       // put the displacements for all local portions on the window
       // get the displacements for all other portions on the window
       res = comm->c_coll->coll_alltoall(abs_sdispls_local, csize, MPI_AINT,
