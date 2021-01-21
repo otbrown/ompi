@@ -223,6 +223,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // GET_BASED WINDOW SETUP - END
       // ****************************
 
+      break;
 
     case algo_trigger_push:
       // uses put to move data into the remote recvbuf - needs rdispls to be exchanged
@@ -296,6 +297,8 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // ****************************
       // PUT_BASED WINDOW SETUP - END
       // ****************************
+
+      break;
 
   } // end switch (algo)
 
