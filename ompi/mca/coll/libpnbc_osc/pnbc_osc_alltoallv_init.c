@@ -54,6 +54,7 @@ typedef enum {
 
 // pull implies move means get and FLAG means RTS (ready to send)
 static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedule *schedule,
+                                          MPI_Win win, MPI_Comm comm,
 //                                          FLAG_t **flags, int *fsize, int *req_count,
                                           const void *sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Aint sendext, MPI_Datatype sendtype,
@@ -330,7 +331,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                                abs_rdispls_other);
                              //abs_sdispls_other);
     case algo_trigger_pull:
-  res = a2av_sched_trigger_pull(crank, csize, schedule, //flags, &fsize, &req_count,
+  res = a2av_sched_trigger_pull(crank, csize, schedule, win, comm, //flags, &fsize, &req_count,
                                sendbuf, sendcounts, sdispls, sendext, sendtype,
                                recvbuf, recvcounts, rdispls, recvext, recvtype,
                                abs_rdispls_other);
@@ -412,8 +413,10 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   return OMPI_SUCCESS;
 }
 
+static const int FLAG_TRUE = !0;
+
 static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedule *schedule,
-//                                          FLAG_t **flags, int *fsize, int *req_count,
+                                          MPI_Win win, MPI_Comm comm,
                                           const void *sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Aint sendext, MPI_Datatype sendtype,
                                                 void *recvbuf, const int *recvcounts, const int *rdispls,
@@ -439,6 +442,20 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   FLAG_t *flags_request_DATA = &(schedule->flags[3 * csize * sizeof(FLAG_t)]); // local usage only
   FLAG_t *flags_request_DONE = &(schedule->flags[4 * csize * sizeof(FLAG_t)]); // local usage only
 
+  MPI_Aint *flag_displs = malloc(4 * csize * sizeof(MPI_Aint)); // used temporarily in this procedure only
+  MPI_Aint *flag_displs_local = &flag_displs[0 * csize * sizeof(MPI_Aint)]; // used as input for MPI_Alltoall
+  MPI_Aint *flag_displs_other = &flag_displs[2 * csize * sizeof(MPI_Aint)]; // used as output for MPI_Alltoall
+  MPI_Aint *FLAG_displs_local = &flag_displs_local[0 * csize * sizeof(MPI_Aint)]; // set locally in MPI_Get_address
+  MPI_Aint *DONE_displs_local = &flag_displs_local[1 * csize * sizeof(MPI_Aint)]; // set locally in MPI_Get_address
+  MPI_Aint *FLAG_displs_other = &flag_displs_other[0 * csize * sizeof(MPI_Aint)]; // set remotely, copied into put_args
+  MPI_Aint *DONE_displs_other = &flag_displs_other[1 * csize * sizeof(MPI_Aint)]; // set remotely, copied into put_args
+
+  for (int i=0;i<csize;++i) {
+    MPI_Get_address(&flags_rma_put_FLAG[i], &FLAG_displs_local[i]);
+    MPI_Get_address(&flags_rma_put_DONE[i], &DONE_displs_local[i]);
+  }
+  MPI_Alltoall(flag_displs_local, 2*csize, MPI_AINT, flag_displs_other, 2*csize, MPI_AINT, comm);
+
   schedule->requests = malloc(3 * csize * sizeof(MPI_Request*));
   MPI_Request **requests_rputFLAG = &(schedule->requests[0 * csize * sizeof(MPI_Request*)]); // circumvent the request?
   MPI_Request **requests_moveData = &(schedule->requests[1 * csize * sizeof(MPI_Request*)]); // combine into PUT_NOTIFY?
@@ -449,7 +466,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   any_args_t *action_args_DATA = &(schedule->action_args_list[1 * csize * sizeof(any_args_t)]);
   any_args_t *action_args_DONE = &(schedule->action_args_list[2 * csize * sizeof(any_args_t)]);
 
-  schedule->trigger_arrays = malloc(6 * sizeof(triggerable_array)); // TODO:replace csize*triggerable_single with triggerable_array
+  // schedule->trigger_arrays = malloc(6 * sizeof(triggerable_array)); // TODO:replace csize*triggerable_single with triggerable_array
 
   for (int p=0;p<csize;++p) {
     int orank = (crank+p)%csize;
@@ -461,6 +478,18 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase0[orank].test = &triggered_all_bynonzero_int;
     triggers_phase0[orank].action = action_all_put_p;
     triggers_phase0[orank].action_cbstate = &action_args_FLAG[orank];
+    {
+      put_args_t *args = &(action_args_FLAG[orank].put_args);
+      args->buf = &FLAG_TRUE;
+      args->origin_count = 1;
+      args->origin_datatype = MPI_INT;
+      args->target = orank;
+      args->target_displ = FLAG_displs_other[orank];
+      args-> target_count = 1;
+      args->target_datatype = MPI_INT;
+      args->win = win;
+      args->request = requests_rputFLAG[orank];
+    }
 
     // set 1 - triggered by: remote rma put (responds to action from remote set 0)
     //         trigger: set local FLAG integer to non-zero value
@@ -469,6 +498,16 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase1[orank].test = &triggered_all_bynonzero_int;
     triggers_phase1[orank].action = action_all_get_p;
     triggers_phase1[orank].action_cbstate = &action_args_DATA[orank];
+    {
+      get_args_t *args = &(action_args_DATA[orank].get_args);
+      args->buf = (void*)&(((char*)recvbuf)[recvext*orank]);
+      args->origin_count = args->target_count = recvcounts[orank];
+      args->origin_datatype = args->target_datatype = recvtype;
+      args->target = orank;
+      args->target_displ = abs_sdispls_other[orank];
+      args->win = win;
+      args->request = requests_moveData[orank];
+    }
 
     // set 2 - triggered by: local test (completes the action from local set 1)
     //         trigger: MPI_Test(requests_moveData[orank], &flags_request_DATA[orank]);
@@ -478,6 +517,18 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase2[orank].test_cbstate = requests_moveData[orank];
     triggers_phase2[orank].action = action_all_put_p;
     triggers_phase2[orank].action_cbstate = &action_args_DONE[orank];
+    {
+      put_args_t *args = &(action_args_DONE[orank].put_args);
+      args->buf = &FLAG_TRUE;
+      args->origin_count = 1;
+      args->origin_datatype = MPI_INT;
+      args->target = orank;
+      args->target_displ = DONE_displs_other[orank];
+      args-> target_count = 1;
+      args->target_datatype = MPI_INT;
+      args->win = win;
+      args->request = requests_rputDONE[orank];
+    }
 
     // set 3 - triggered by: local test (completes the action from local set 0)
     //         trigger: MPI_Test(requests_rputFLAG[orank], &flags_request_FLAG[orank]);
@@ -507,9 +558,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
 
   }
 
-  // schedule a copy for the local MPI process, if needed
-  if (recvcounts[crank] != 0) {
-  }
+  free(flag_displs); // all remote values are now stored in put_args structs, we can get rid of this temp space
 
   return res;
 }
