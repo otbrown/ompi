@@ -55,7 +55,8 @@ typedef enum {
 // pull implies move means get and FLAG means RTS (ready to send)
 static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedule *schedule,
                                           MPI_Win win, MPI_Comm comm,
-//                                          FLAG_t **flags, int *fsize, int *req_count,
+//                                          FLAG_t **flags,
+                                          int *fsize,
                                           const void *sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Aint sendext, MPI_Datatype sendtype,
                                                 void *recvbuf, const int *recvcounts, const int *rdispls,
@@ -331,7 +332,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                                abs_rdispls_other);
                              //abs_sdispls_other);
     case algo_trigger_pull:
-  res = a2av_sched_trigger_pull(crank, csize, schedule, win, comm, //flags, &fsize, &req_count,
+  res = a2av_sched_trigger_pull(crank, csize, schedule, win, comm, &fsize, //flags, &fsize, &req_count,
                                sendbuf, sendcounts, sdispls, sendext, sendtype,
                                recvbuf, recvcounts, rdispls, recvext, recvtype,
                                abs_rdispls_other);
@@ -376,7 +377,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
     }
 
     // attach the flags memory to the winflag window (fsize provided by the schedule)
-    res = win->w_osc_module->osc_win_attach(winflag, flags, fsize);
+    res = win->w_osc_module->osc_win_attach(winflag, schedule->flags, fsize);
     if (OMPI_SUCCESS != res) {
       PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
       free(abs_rdispls_other);
@@ -416,7 +417,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
 static const int FLAG_TRUE = !0;
 
 static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedule *schedule,
-                                          MPI_Win win, MPI_Comm comm,
+                                          MPI_Win win, MPI_Comm comm, int *fsize,
                                           const void *sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Aint sendext, MPI_Datatype sendtype,
                                                 void *recvbuf, const int *recvcounts, const int *rdispls,
@@ -455,6 +456,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     MPI_Get_address(&flags_rma_put_DONE[i], &DONE_displs_local[i]);
   }
   MPI_Alltoall(flag_displs_local, 2*csize, MPI_AINT, flag_displs_other, 2*csize, MPI_AINT, comm);
+  *fsize = 2*csize*sizeof(FLAG_t);
 
   schedule->requests = malloc(3 * csize * sizeof(MPI_Request*));
   MPI_Request **requests_rputFLAG = &(schedule->requests[0 * csize * sizeof(MPI_Request*)]); // circumvent the request?
