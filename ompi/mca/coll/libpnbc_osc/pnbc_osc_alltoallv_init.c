@@ -364,35 +364,35 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   }
 
   if (0 == schedule->flags_length) {
-    winflag = MPI_WIN_NULL;
+    win = MPI_WIN_NULL;
   } else {
     // create a dynamic window - flags will be signalled here
-    res = ompi_win_create_dynamic(&info->super, comm, &winflag);
-    if (OMPI_SUCCESS != res) {
-      PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
-      free(abs_rdispls_other);
-      free(abs_rdispls_local);
-      MPI_Win_free(&win);
-      OBJ_RELEASE(schedule);
-      return res;
-    }
+//    res = ompi_win_create_dynamic(&info->super, comm, &winflag);
+//    if (OMPI_SUCCESS != res) {
+//      PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
+//      free(abs_rdispls_other);
+//      free(abs_rdispls_local);
+//      MPI_Win_free(&win);
+//      OBJ_RELEASE(schedule);
+//      return res;
+//    }
 
     // attach the flags memory to the winflag window (fsize provided by the schedule)
-    res = win->w_osc_module->osc_win_attach(winflag, schedule->flags, schedule->flags_length);
+    res = win->w_osc_module->osc_win_attach(win, schedule->flags, schedule->flags_length);
     if (OMPI_SUCCESS != res) {
       PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
       free(abs_rdispls_other);
       free(abs_rdispls_local);
       MPI_Win_free(&win);
       OBJ_RELEASE(schedule);
-      MPI_Win_free(&winflag);
+//      MPI_Win_free(&winflag);
       return res;
     }
 
     // lock the flags window at all other processes
-    res = MPI_Win_lock_all(MPI_MODE_NOCHECK, winflag);
+    res = MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
     if (OMPI_SUCCESS != res) {
-      PNBC_OSC_Error ("MPI Error in MPI_Win_lock_all for winflag (%i)", res);
+      PNBC_OSC_Error ("MPI Error in MPI_Win_lock_all for win (%i)", res);
       free(abs_rdispls_other);
       free(abs_rdispls_local);
       MPI_Win_free(&win);
