@@ -108,6 +108,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   int fsize = 0;
   int req_count;
   ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
+  int buf_size = 0;
 
   PNBC_OSC_IN_PLACE(sendbuf, recvbuf, inplace);
   if (inplace) {
@@ -190,26 +191,34 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
 
       // attach all pieces of local sendbuf to local window and record their absolute displacements
       for (int r=0;r<csize;++r) {
-        res = win->w_osc_module->osc_win_attach(win, (char*)sendbuf+sdispls[r], sendext*sendcounts[r]);
-        if (OMPI_SUCCESS != res) {
-          PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
-          free(abs_sdispls_other);
-          free(abs_sdispls_local);
-          MPI_Win_free(&win);
-          return res;
-        }
-        PNBC_OSC_DEBUG(1, "[pnbc_alltoallv_init] %d attaches to dynamic window memory for rank %d with address %p (computed from sdispl value %d) of size %d bytes (computed from sendcount value %d)\n",
-                       crank, r,
-                       (char*)sendbuf+sdispls[r],
-                       sdispls[r],
-                       sendext*sendcounts[r],
-                       sendcounts[r]);
-
-        // compute displacement of local window memory portion
-        abs_sdispls_local[r] = MPI_Aint_add(abs_sendbuf, (MPI_Aint)sdispls[r]);
-        PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d gets address at disp %ld\n",
+        buf_size += sendcounts[r];
+	abs_sdispls_local[r] = MPI_Aint_add(abs_sendbuf, (MPI_Aint)sdispls[r]);
+	PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d gets address at disp %ld\n",
                        crank, abs_sdispls_local[r]);
       }
+      
+      res = win->w_osc_module->osc_win_attach(win, (char*)sendbuf, sendext*buf_size);
+
+        //res = win->w_osc_module->osc_win_attach(win, (char*)sendbuf+sdispls[r], sendext*sendcounts[r]);
+      if (OMPI_SUCCESS != res) {
+        PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
+        free(abs_sdispls_other);
+        free(abs_sdispls_local);
+        MPI_Win_free(&win);
+        return res;
+      }
+//      PNBC_OSC_DEBUG(1, "[pnbc_alltoallv_init] %d attaches to dynamic window memory for rank %d with address %p (computed from sdispl value %d) of size %d bytes (computed from sendcount value %d)\n",
+//                     crank, r,
+//                     (char*)sendbuf+sdispls[r],
+//                     sdispls[r],
+//                     sendext*sendcounts[r],
+//                     sendcounts[r]);
+//
+        // compute displacement of local window memory portion
+      //abs_sdispls_local[r] = MPI_Aint_add(abs_sendbuf, (MPI_Aint)sdispls[r]);
+      //PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d gets address at disp %ld\n",
+      //                 crank, abs_sdispls_local[r]);
+      
 
       // swap local sdispls for remote sdispls
       // put the displacements for all local portions on the window
