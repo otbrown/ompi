@@ -205,9 +205,9 @@ int PNBC_OSC_Schedule_request(PNBC_OSC_Schedule *schedule, ompi_communicator_t *
                               ompi_coll_libpnbc_osc_module_t *module, bool persistent,
                               ompi_request_t **request, void *tmpbuf);
 int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator_t *comm,
-                                  ompi_win_t *win,ompi_win_t *winflag, int req_count,
+                                  ompi_win_t *win,
                                   ompi_coll_libpnbc_osc_module_t *module,
-                                  bool persistent, ompi_request_t **request, void *tmpbuf);
+                                  bool persistent, ompi_request_t **request);
   
 int PNBC_OSC_Start(PNBC_OSC_Handle *handle);
 int PNBC_OSC_Progress(PNBC_OSC_Handle *handle);

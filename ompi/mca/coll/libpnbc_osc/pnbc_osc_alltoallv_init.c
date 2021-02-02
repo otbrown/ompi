@@ -46,15 +46,13 @@ int ompi_coll_libpnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcou
 }
 
 typedef enum {
-  algo_linear_rput,
-  algo_linear_rget,
   algo_trigger_pull,
   algo_trigger_push,
 } a2av_sched_algo;
 
 // pull implies move means get and FLAG means RTS (ready to send)
 static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedule *schedule,
-//                                          FLAG_t **flags, int *fsize, int *req_count,
+                                          MPI_Win win, MPI_Comm comm,
                                           const void *sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Aint sendext, MPI_Datatype sendtype,
                                                 void *recvbuf, const int *recvcounts, const int *rdispls,
@@ -63,28 +61,12 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
 
 // push implies move means put and FLAG means CTS (clear to send)
 static inline int a2av_sched_trigger_push(int crank, int csize, PNBC_OSC_Schedule *schedule,
-                                          void *flags, int *fsize, int *req_count,
+                                          MPI_Win win, MPI_Comm comm,
                                           const void *sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Aint sendext, MPI_Datatype sendtype,
                                                 void *recvbuf, const int *recvcounts, const int *rdispls,
                                           MPI_Aint recvext, MPI_Datatype recvtype,
                                           MPI_Aint *abs_rdispls_other);
-
-static inline int a2av_sched_linear_rget(int crank, int csize, PNBC_OSC_Schedule *schedule,
-                                         void *flags, int *fsize, int *req_count,
-                                         const void *sendbuf, const int *sendcounts, const int *sdispls,
-                                         MPI_Aint sendext, MPI_Datatype sendtype,
-                                               void *recvbuf, const int *recvcounts, const int *rdispls,
-                                         MPI_Aint recvext, MPI_Datatype recvtype,
-                                         MPI_Aint *abs_sdispls_other);
-
-static inline int a2av_sched_linear_rput(int crank, int csize, PNBC_OSC_Schedule *schedule,
-                                         void *flags, int *fsize, int *req_count,
-                                         const void *sendbuf, const int *sendcounts, const int *sdispls,
-                                         MPI_Aint sendext, MPI_Datatype sendtype,
-                                               void *recvbuf, const int *recvcounts, const int *rdispls,
-                                         MPI_Aint recvext, MPI_Datatype recvtype,
-                                         MPI_Aint *abs_rdispls_other);
 
 static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                   MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
@@ -96,15 +78,13 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   MPI_Aint sendext, recvext;
   PNBC_OSC_Schedule *schedule;
   int crank, csize;
-  MPI_Aint base_sendbuf, abs_sendbuf;
+  MPI_Aint base_sendbuf;
   MPI_Aint *abs_sdispls_other, *abs_sdispls_local;
-  MPI_Aint base_recvbuf, abs_recvbuf;
+  MPI_Aint base_recvbuf;
   MPI_Aint *abs_rdispls_other, *abs_rdispls_local;
-  MPI_Win win, winflag;
-  void *flags = NULL;
-  int fsize = 0;
-  int req_count;
+  MPI_Win win;
   ompi_coll_libpnbc_osc_module_t *libpnbc_osc_module = (ompi_coll_libpnbc_osc_module_t*) module;
+  int buf_size = 0;
 
   PNBC_OSC_IN_PLACE(sendbuf, recvbuf, inplace);
   if (inplace) {
@@ -132,16 +112,12 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   crank = ompi_comm_rank(comm);
   csize = ompi_comm_size(comm);
 
-  // TODO [DanH] add code to examine info and decide which algo to use
-
   a2av_sched_algo algo = algo_trigger_push;
 
   if ( check_config_value_equal("a2av_algo_requested", info, "linear_trigger_pull") )
     algo = algo_trigger_pull;
   if ( check_config_value_equal("a2av_algo_requested", info, "linear_trigger_push") )
     algo = algo_trigger_push;
-
-  // END OF DanH changes for info
 
   // create a dynamic window - data here will be accessed by remote processes
   res = ompi_win_create_dynamic(&info->super, comm, &win);
@@ -150,12 +126,8 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
     return res;
   }
 
-
   switch (algo) {
-    case algo_linear_rput: // ignore
-      break;
-    case algo_linear_rget: // ignore
-      break;
+
     case algo_trigger_pull:
       // uses get to move data from the remote sendbuf - needs sdispls to be exchanged
 
@@ -170,7 +142,6 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
         MPI_Win_free(&win);
         return res;
       }
-      abs_sendbuf = MPI_Aint_add(MPI_BOTTOM, base_sendbuf);
 
       // create an array of displacements where all ranks will gather their window memory base address
       abs_sdispls_other = (MPI_Aint*)malloc(csize * sizeof(MPI_Aint));
@@ -185,28 +156,29 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
         return OMPI_ERR_OUT_OF_RESOURCE;
       }
 
-      // attach all pieces of local sendbuf to local window and record their absolute displacements
+      // compute the total size of all pieces of local sendbuf and record their absolute displacements
       for (int r=0;r<csize;++r) {
-        res = win->w_osc_module->osc_win_attach(win, (char*)sendbuf+sdispls[r], sendext*sendcounts[r]);
-        if (OMPI_SUCCESS != res) {
-          PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
-          free(abs_sdispls_other);
-          free(abs_sdispls_local);
-          MPI_Win_free(&win);
-          return res;
-        }
-        PNBC_OSC_DEBUG(1, "[pnbc_alltoallv_init] %d attaches to dynamic window memory for rank %d with address %p (computed from sdispl value %d) of size %d bytes (computed from sendcount value %d)\n",
-                       crank, r,
-                       (char*)sendbuf+sdispls[r],
-                       sdispls[r],
-                       sendext*sendcounts[r],
-                       sendcounts[r]);
-
-        // compute displacement of local window memory portion
-        abs_sdispls_local[r] = MPI_Aint_add(abs_sendbuf, (MPI_Aint)sdispls[r]);
-        PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d gets address at disp %ld\n",
+        buf_size += sendcounts[r];
+        abs_sdispls_local[r] = MPI_Aint_add(base_sendbuf, (MPI_Aint)sdispls[r]);
+       	PNBC_OSC_DEBUG(20, "[pnbc_alltoallv_init] %d gets address at disp %ld",
                        crank, abs_sdispls_local[r]);
       }
+
+      // attach all of the local sendbuf to local window as one large chunk of memory
+      res = win->w_osc_module->osc_win_attach(win, (char*)sendbuf, sendext*buf_size);
+      if (OMPI_SUCCESS != res) {
+        PNBC_OSC_Error ("MPI Error in win_attach (%i)", res);
+        free(abs_sdispls_other);
+        free(abs_sdispls_local);
+        MPI_Win_free(&win);
+        return res;
+      }
+      PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d attaches to dynamic window memory for all ranks with address %p (computed from sdispl value %d) of size %d bytes (computed from sum of sendcount values %d)",
+                     crank,
+                     (char*)sendbuf,
+                     sdispls[0],
+                     sendext*buf_size,
+                     buf_size);
 
       // swap local sdispls for remote sdispls
       // put the displacements for all local portions on the window
@@ -229,6 +201,19 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // GET_BASED WINDOW SETUP - END
       // ****************************
 
+      res = a2av_sched_trigger_pull(crank, csize, schedule, win, comm,
+                                    sendbuf, sendcounts, sdispls, sendext, sendtype,
+                                    recvbuf, recvcounts, rdispls, recvext, recvtype,
+                                    abs_sdispls_other);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+        PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)", res);
+        free(abs_sdispls_other);
+        free(abs_sdispls_local);
+        MPI_Win_free(&win);
+        OBJ_RELEASE(schedule);
+        return res;
+      }
+
       break;
 
     case algo_trigger_push:
@@ -245,7 +230,6 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
         MPI_Win_free(&win);
         return res;
       }
-      abs_recvbuf = MPI_Aint_add(MPI_BOTTOM, base_recvbuf);
     
       // create an array of displacements where all ranks will gather their window memory base address
       abs_rdispls_other = (MPI_Aint*)malloc(csize * sizeof(MPI_Aint));
@@ -278,7 +262,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                        recvcounts[r]);
     
         // compute displacement of local window memory portion
-        abs_rdispls_local[r] = MPI_Aint_add(abs_recvbuf, (MPI_Aint)rdispls[r]);
+        abs_rdispls_local[r] = MPI_Aint_add(base_recvbuf, (MPI_Aint)rdispls[r]);
         PNBC_OSC_DEBUG(1, "[nbc_allreduce_init] %d gets address at disp %ld\n",
                        crank, abs_rdispls_local[r]);
       }
@@ -304,49 +288,45 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // PUT_BASED WINDOW SETUP - END
       // ****************************
 
+      res = a2av_sched_trigger_push(crank, csize, schedule, win, comm,
+                                    sendbuf, sendcounts, sdispls, sendext, sendtype,
+                                    recvbuf, recvcounts, rdispls, recvext, recvtype,
+                                    abs_rdispls_other);
+      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
+        PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)", res);
+        free(abs_rdispls_other);
+        free(abs_rdispls_local);
+        MPI_Win_free(&win);
+        OBJ_RELEASE(schedule);
+        return res;
+      }
+
       break;
 
   } // end switch (algo)
 
+  // attach the flags memory to the win window (details provided by the schedule)
+  if (OPAL_UNLIKELY(0 == schedule->flags_length)) {
+    return OMPI_ERROR;
+  } else {
+    res = win->w_osc_module->osc_win_attach(win, schedule->flags, schedule->flags_length);
+    if (OMPI_SUCCESS != res) {
+      PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
+      free(abs_rdispls_other);
+      free(abs_rdispls_local);
+      MPI_Win_free(&win);
+      OBJ_RELEASE(schedule);
+      return res;
+    }
+  }
+
+  // lock the flags window at all other processes
   res = MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
   if (OMPI_SUCCESS != res) {
     PNBC_OSC_Error ("MPI Error in MPI_Win_lock_all (%i)", res);
     free(abs_rdispls_other);
     free(abs_rdispls_local);
     MPI_Win_free(&win);
-    return res;
-  }
-
-  switch (algo) {
-    case algo_linear_rput:
-  res = a2av_sched_linear_rput(crank, csize, schedule, flags, &fsize, &req_count,
-                               sendbuf, sendcounts, sdispls, sendext, sendtype,
-                               recvbuf, recvcounts, rdispls, recvext, recvtype,
-                               abs_rdispls_other);
-    case algo_linear_rget:
-  res = a2av_sched_linear_rget(crank, csize, schedule, flags, &fsize, &req_count,
-                               sendbuf, sendcounts, sdispls, sendext, sendtype,
-                               recvbuf, recvcounts, rdispls, recvext, recvtype,
-                               abs_rdispls_other);
-                             //abs_sdispls_other);
-    case algo_trigger_pull:
-  res = a2av_sched_trigger_pull(crank, csize, schedule, //flags, &fsize, &req_count,
-                               sendbuf, sendcounts, sdispls, sendext, sendtype,
-                               recvbuf, recvcounts, rdispls, recvext, recvtype,
-                               abs_rdispls_other);
-    case algo_trigger_push:
-  res = a2av_sched_trigger_push(crank, csize, schedule, flags, &fsize, &req_count,
-                               sendbuf, sendcounts, sdispls, sendext, sendtype,
-                               recvbuf, recvcounts, rdispls, recvext, recvtype,
-                               abs_rdispls_other);
-                             //abs_sdispls_other);
-  }
-  if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-    PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)", res);
-    free(abs_rdispls_other);
-    free(abs_rdispls_local);
-    MPI_Win_free(&win);
-    OBJ_RELEASE(schedule);
     return res;
   }
 
@@ -360,60 +340,23 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
     return res;
   }
 
-  if (0 == fsize) {
-    winflag = MPI_WIN_NULL;
-  } else {
-    // create a dynamic window - flags will be signalled here
-    res = ompi_win_create_dynamic(&info->super, comm, &winflag);
-    if (OMPI_SUCCESS != res) {
-      PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
-      free(abs_rdispls_other);
-      free(abs_rdispls_local);
-      MPI_Win_free(&win);
-      OBJ_RELEASE(schedule);
-      return res;
-    }
-
-    // attach the flags memory to the winflag window (fsize provided by the schedule)
-    res = win->w_osc_module->osc_win_attach(winflag, flags, fsize);
-    if (OMPI_SUCCESS != res) {
-      PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
-      free(abs_rdispls_other);
-      free(abs_rdispls_local);
-      MPI_Win_free(&win);
-      OBJ_RELEASE(schedule);
-      MPI_Win_free(&winflag);
-      return res;
-    }
-
-    // lock the flags window at all other processes
-    res = MPI_Win_lock_all(MPI_MODE_NOCHECK, winflag);
-    if (OMPI_SUCCESS != res) {
-      PNBC_OSC_Error ("MPI Error in MPI_Win_lock_all for winflag (%i)", res);
-      free(abs_rdispls_other);
-      free(abs_rdispls_local);
-      MPI_Win_free(&win);
-      return res;
-    }
-
-  }
-
-  res = PNBC_OSC_Schedule_request_win(schedule, comm, win, winflag, req_count, libpnbc_osc_module, persistent, request, flags);
+  res = PNBC_OSC_Schedule_request_win(schedule, comm, win, libpnbc_osc_module, persistent, request);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     PNBC_OSC_Error ("MPI Error in PNBC_OSC_Schedule_request_win (%i)", res);
     free(abs_rdispls_other);
     free(abs_rdispls_local);
     MPI_Win_free(&win);
     OBJ_RELEASE(schedule);
-    MPI_Win_free(&winflag);
     return res;
   }
 
   return OMPI_SUCCESS;
 }
 
+static const int FLAG_TRUE = !0;
+
 static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedule *schedule,
-//                                          FLAG_t **flags, int *fsize, int *req_count,
+                                          MPI_Win win, MPI_Comm comm,
                                           const void *sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Aint sendext, MPI_Datatype sendtype,
                                                 void *recvbuf, const int *recvcounts, const int *rdispls,
@@ -432,12 +375,27 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   triggerable_t *triggers_phase4 = &(schedule->triggers[4 * csize * sizeof(triggerable_t)]);
   triggerable_t *triggers_phase5 = &(schedule->triggers[5 * csize * sizeof(triggerable_t)]);
 
-  schedule->flags = malloc(5 * csize * sizeof(FLAG_t));
+  schedule->flags = (FLAG_t*) malloc(5 * csize * sizeof(FLAG_t));
   FLAG_t *flags_rma_put_FLAG = &(schedule->flags[0 * csize * sizeof(FLAG_t)]); // needs exposure via MPI window
   FLAG_t *flags_rma_put_DONE = &(schedule->flags[1 * csize * sizeof(FLAG_t)]); // needs exposure via MPI window
   FLAG_t *flags_request_FLAG = &(schedule->flags[2 * csize * sizeof(FLAG_t)]); // local usage only
   FLAG_t *flags_request_DATA = &(schedule->flags[3 * csize * sizeof(FLAG_t)]); // local usage only
   FLAG_t *flags_request_DONE = &(schedule->flags[4 * csize * sizeof(FLAG_t)]); // local usage only
+
+  MPI_Aint *flag_displs = malloc(4 * csize * sizeof(MPI_Aint)); // used temporarily in this procedure only
+  MPI_Aint *flag_displs_local = &flag_displs[0 * csize * sizeof(MPI_Aint)]; // used as input for MPI_Alltoall
+  MPI_Aint *flag_displs_other = &flag_displs[2 * csize * sizeof(MPI_Aint)]; // used as output for MPI_Alltoall
+  MPI_Aint *FLAG_displs_local = &flag_displs_local[0 * csize * sizeof(MPI_Aint)]; // set locally in MPI_Get_address
+  MPI_Aint *DONE_displs_local = &flag_displs_local[1 * csize * sizeof(MPI_Aint)]; // set locally in MPI_Get_address
+  MPI_Aint *FLAG_displs_other = &flag_displs_other[0 * csize * sizeof(MPI_Aint)]; // set remotely, copied into put_args
+  MPI_Aint *DONE_displs_other = &flag_displs_other[1 * csize * sizeof(MPI_Aint)]; // set remotely, copied into put_args
+
+  for (int i=0;i<csize;++i) {
+    MPI_Get_address(&flags_rma_put_FLAG[i], &FLAG_displs_local[i]);
+    MPI_Get_address(&flags_rma_put_DONE[i], &DONE_displs_local[i]);
+  }
+  MPI_Alltoall(flag_displs_local, 2*csize, MPI_AINT, flag_displs_other, 2*csize, MPI_AINT, comm);
+  schedule->flags_length = 2*csize*sizeof(FLAG_t); // size of memory to expose to other ranks via window
 
   schedule->requests = malloc(3 * csize * sizeof(MPI_Request*));
   MPI_Request **requests_rputFLAG = &(schedule->requests[0 * csize * sizeof(MPI_Request*)]); // circumvent the request?
@@ -449,7 +407,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   any_args_t *action_args_DATA = &(schedule->action_args_list[1 * csize * sizeof(any_args_t)]);
   any_args_t *action_args_DONE = &(schedule->action_args_list[2 * csize * sizeof(any_args_t)]);
 
-  schedule->trigger_arrays = malloc(6 * sizeof(triggerable_array)); // TODO:replace csize*triggerable_single with triggerable_array
+  // schedule->trigger_arrays = malloc(6 * sizeof(triggerable_array)); // TODO:replace csize*triggerable_single with triggerable_array
 
   for (int p=0;p<csize;++p) {
     int orank = (crank+p)%csize;
@@ -461,6 +419,18 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase0[orank].test = &triggered_all_bynonzero_int;
     triggers_phase0[orank].action = action_all_put_p;
     triggers_phase0[orank].action_cbstate = &action_args_FLAG[orank];
+    {
+      put_args_t *args = &(action_args_FLAG[orank].put_args);
+      args->buf = &FLAG_TRUE;
+      args->origin_count = 1;
+      args->origin_datatype = MPI_INT;
+      args->target = orank;
+      args->target_displ = FLAG_displs_other[orank];
+      args-> target_count = 1;
+      args->target_datatype = MPI_INT;
+      args->win = win;
+      args->request = requests_rputFLAG[orank];
+    }
 
     // set 1 - triggered by: remote rma put (responds to action from remote set 0)
     //         trigger: set local FLAG integer to non-zero value
@@ -469,6 +439,16 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase1[orank].test = &triggered_all_bynonzero_int;
     triggers_phase1[orank].action = action_all_get_p;
     triggers_phase1[orank].action_cbstate = &action_args_DATA[orank];
+    {
+      get_args_t *args = &(action_args_DATA[orank].get_args);
+      args->buf = (void*)&(((char*)recvbuf)[recvext*orank]);
+      args->origin_count = args->target_count = recvcounts[orank];
+      args->origin_datatype = args->target_datatype = recvtype;
+      args->target = orank;
+      args->target_displ = abs_sdispls_other[orank];
+      args->win = win;
+      args->request = requests_moveData[orank];
+    }
 
     // set 2 - triggered by: local test (completes the action from local set 1)
     //         trigger: MPI_Test(requests_moveData[orank], &flags_request_DATA[orank]);
@@ -478,6 +458,18 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase2[orank].test_cbstate = requests_moveData[orank];
     triggers_phase2[orank].action = action_all_put_p;
     triggers_phase2[orank].action_cbstate = &action_args_DONE[orank];
+    {
+      put_args_t *args = &(action_args_DONE[orank].put_args);
+      args->buf = &FLAG_TRUE;
+      args->origin_count = 1;
+      args->origin_datatype = MPI_INT;
+      args->target = orank;
+      args->target_displ = DONE_displs_other[orank];
+      args-> target_count = 1;
+      args->target_datatype = MPI_INT;
+      args->win = win;
+      args->request = requests_rputDONE[orank];
+    }
 
     // set 3 - triggered by: local test (completes the action from local set 0)
     //         trigger: MPI_Test(requests_rputFLAG[orank], &flags_request_FLAG[orank]);
@@ -507,15 +499,13 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
 
   }
 
-  // schedule a copy for the local MPI process, if needed
-  if (recvcounts[crank] != 0) {
-  }
+  free(flag_displs); // all remote values are now stored in put_args structs, we can get rid of this temp space
 
   return res;
 }
 
 static inline int a2av_sched_trigger_push(int crank, int csize, PNBC_OSC_Schedule *schedule,
-                                          void *flags, int *fsize, int *req_count,
+                                          MPI_Win win, MPI_Comm comm,
                                           const void *sendbuf, const int *sendcounts, const int *sdispls,
                                           MPI_Aint sendext, MPI_Datatype sendtype,
                                                 void *recvbuf, const int *recvcounts, const int *rdispls,
@@ -529,101 +519,5 @@ static inline int a2av_sched_trigger_push(int crank, int csize, PNBC_OSC_Schedul
   }
 
   return res;
-}
-
-static inline int a2av_sched_linear_rget(int crank, int csize, PNBC_OSC_Schedule *schedule,
-                                         void *flags, int *fsize, int *req_count,
-                                         const void *sendbuf, const int *sendcounts, const int *sdispls,
-                                         MPI_Aint sendext, MPI_Datatype sendtype,
-                                               void *recvbuf, const int *recvcounts, const int *rdispls,
-                                         MPI_Aint recvext, MPI_Datatype recvtype,
-                                         MPI_Aint *abs_sdispls_other) {
-  int res;
-  char *rbuf, *sbuf;
-
-  // schedule a copy for the local MPI process, if needed
-  if (recvcounts[crank] != 0) {
-    sbuf = (char *) sendbuf + sdispls[crank] * sendext;
-    rbuf = (char *) recvbuf + rdispls[crank] * recvext;
-    res = PNBC_OSC_Sched_copy(sbuf, false, sendcounts[crank], sendtype,
-                              rbuf, false, recvcounts[crank], recvtype, schedule, false);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-      OBJ_RELEASE(schedule);
-      return res;
-    }
-  }
-
-  *req_count = csize - 1;
-
-  // schedule a get for each remote target, if needed
-  for (int dist = 1 ; dist < csize ; ++dist) {
-    // start from dist==1 to exclude local rank, local is a copy not a get
-    int orank = (crank + dist) % csize;
-    if (recvcounts[orank] != 0) {
-      rbuf = (char *) recvbuf + rdispls[orank] * recvext;
-
-      res = PNBC_OSC_Sched_rget(rbuf, orank,
-                                sendcounts[orank], sendtype,
-                                recvcounts[orank], recvtype,
-                                abs_sdispls_other[orank],
-                                schedule, false);
-
-      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        OBJ_RELEASE(schedule);
-        return res;
-      }
-
-    }
-  }
-
-  return OMPI_SUCCESS;
-}
-
-static inline int a2av_sched_linear_rput(int crank, int csize, PNBC_OSC_Schedule *schedule,
-                                         void *flags, int *fsize, int *req_count,
-                                         const void *sendbuf, const int *sendcounts, const int *sdispls,
-                                         MPI_Aint sendext, MPI_Datatype sendtype,
-                                               void *recvbuf, const int *recvcounts, const int *rdispls,
-                                         MPI_Aint recvext, MPI_Datatype recvtype,
-                                         MPI_Aint *abs_rdispls_other) {
-  int res;
-  char *rbuf, *sbuf;
-
-  // schedule a copy for the local MPI process, if needed
-  if (sendcounts[crank] != 0) {
-    sbuf = (char *) sendbuf + sdispls[crank] * sendext;
-    rbuf = (char *) recvbuf + rdispls[crank] * recvext;
-    res = PNBC_OSC_Sched_copy(sbuf, false, sendcounts[crank], sendtype,
-                              rbuf, false, recvcounts[crank], recvtype, schedule, false);
-    if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-      OBJ_RELEASE(schedule);
-      return res;
-    }
-  }
-
-  *req_count = csize - 1;
-
-  // schedule a put for each remote target, if needed
-  for (int dist = 1 ; dist < csize ; ++dist) {
-    // start from dist==1 to exclude local rank, local is a copy not a put
-    int orank = (crank + dist) % csize;
-    if (sendcounts[orank] != 0) {
-      sbuf = (char *) sendbuf + sdispls[orank] * sendext;
-
-      res = PNBC_OSC_Sched_rput(sbuf, orank,
-                                sendcounts[orank], sendtype,
-                                recvcounts[orank], recvtype,
-                                abs_rdispls_other[orank],
-                                schedule, false);
-
-      if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        OBJ_RELEASE(schedule);
-        return res;
-      }
-
-    }
-  }
-
-  return OMPI_SUCCESS;
 }
 
