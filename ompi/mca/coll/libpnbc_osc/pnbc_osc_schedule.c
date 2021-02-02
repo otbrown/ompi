@@ -351,42 +351,20 @@ int PNBC_OSC_Schedule_request(PNBC_OSC_Schedule *schedule, ompi_communicator_t *
 }
 
 int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator_t *comm,
-                                  ompi_win_t *win, ompi_win_t *winflag, int req_count,
+                                  ompi_win_t *win,
                                   ompi_coll_libpnbc_osc_module_t *module,
-                                  bool persistent, ompi_request_t **request, void *tmpbuf) {
-  int ret;
+                                  bool persistent, ompi_request_t **request) {
   bool need_register = false;
   ompi_coll_libpnbc_osc_request_t *handle;
-
-  /* no operation (e.g. one process barrier)? */
-  if (((int *)schedule->data)[0] == 0 && schedule->data[sizeof(int)] == 0) {
-    ret = nbc_get_noop_request(persistent, request);
-    if (OMPI_SUCCESS != ret) {
-      return OMPI_ERR_OUT_OF_RESOURCE;
-    }
-
-    OBJ_RELEASE(schedule);
-    free(tmpbuf);
-
-    return OMPI_SUCCESS;
-  }
 
   OMPI_COLL_LIBPNBC_OSC_REQUEST_ALLOC(comm, persistent, handle);
   if (NULL == handle) return OMPI_ERR_OUT_OF_RESOURCE;
 
-  handle->req_count = 0;
   handle->nbc_complete = persistent ? true : false;
   handle->schedule = schedule;
-  handle->schedule->row_offset = 0;
   handle->comm = comm;
   handle->win = win;
-  handle->winflag = winflag;
   handle->comminfo = module;
-  handle->tmpbuf = tmpbuf;
-  if (req_count > 0)
-    handle->req_array = malloc(req_count*sizeof(MPI_Request));
-  else
-    handle->req_array = NULL;
 
   /******************** Do the shadow comm administration ...  ***************/
 
