@@ -8,11 +8,11 @@ int main(int argc, char *argv[]) {
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
   printf("provided thread level is: %d - ", provided);
   switch (provided) {
-    case MPI_THREAD_SINGLE     : printf("mpi_thread_single\n");
-    case MPI_THREAD_FUNNELED   : printf("mpi_thread_funneled\n");
-    case MPI_THREAD_SERIALIZED : printf("mpi_thread_serialized\n");
-    case MPI_THREAD_MULTIPLE   : printf("mpi_thread_multiple\n");
-    default                    : printf("unknown\n");
+    case MPI_THREAD_SINGLE     : printf("mpi_thread_single\n");     break;
+    case MPI_THREAD_FUNNELED   : printf("mpi_thread_funneled\n");   break;
+    case MPI_THREAD_SERIALIZED : printf("mpi_thread_serialized\n"); break;
+    case MPI_THREAD_MULTIPLE   : printf("mpi_thread_multiple\n");   break;
+    default                    : printf("unknown\n");               break;
   }
 
   int csize;
