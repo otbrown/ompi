@@ -56,43 +56,49 @@ int PNBC_OSC_Start(PNBC_OSC_Handle *handle) {
  *
  * to be called *only* from the progress thread !!! */
 int PNBC_OSC_Progress(PNBC_OSC_Handle *handle) {
+  PNBC_OSC_DEBUG(60, "Entering progress engine for single handle\n");
+
   enum TRIGGER_ACTION_STATE state;
 
   // assume trigger-based - old NBC-data way is an error
   if (OPAL_UNLIKELY(NULL != handle->schedule->data)) {
+    PNBC_OSC_DEBUG(10, "NULL (0)\n");
     return OMPI_ERR_BAD_PARAM;
   }
 
-  // assume trigger-based - hybrid round-based is an error
-  if (OPAL_UNLIKELY(NULL != handle->schedule->rounds)) {
-    return OMPI_ERR_BAD_PARAM;
-  }
 
   // protection against progression error - should never happen
   if (OPAL_UNLIKELY(OMPI_REQUEST_ACTIVE != handle->super.req_state)) {
+    PNBC_OSC_DEBUG(10, "NULL (2)\n");
     return OMPI_ERR_BAD_PARAM;
   }
-
+  
+  PNBC_OSC_DEBUG(10, "Triggers_Length: %d\n",handle->schedule->triggers_length);
   // test each triggerable in the schedule
   for (int t=0;t<handle->schedule->triggers_length;++t) {
     state = trigger_test(&(handle->schedule->triggers[t]));
     if (OPAL_UNLIKELY(ACTION_PROBLEM == state)) {
+      PNBC_OSC_DEBUG(10, "RTRN 1\n");
       return OMPI_ERR_NOT_SUPPORTED;
     }
   }
 
+  PNBC_OSC_DEBUG(10, "Triggers_Array_Length: %d\n",handle->schedule->trigger_arrays_length);
   // test each trigger_array in the schedule
   for (int t=0;t<handle->schedule->trigger_arrays_length;++t) {
     state = trigger_test_all(&(handle->schedule->trigger_arrays[t]));
     if (OPAL_UNLIKELY(ACTION_PROBLEM == state)) {
+      PNBC_OSC_DEBUG(10, "RTRN 2\n");
       return OMPI_ERR_NOT_SUPPORTED;
     }
   }
 
   // check new state of this request (will eventually have been changed by a trigger)
-  if (OMPI_REQUEST_ACTIVE == handle->super.req_state) {
+  if (OMPI_REQUEST_ACTIVE != handle->super.req_state) { 
+    PNBC_OSC_DEBUG(10, "RTRN 3\n");
     return PNBC_OSC_SUCCESS;
   } else {
+    PNBC_OSC_DEBUG(60, "RTRN 4\n");
     return PNBC_OSC_CONTINUE;
   }
 }

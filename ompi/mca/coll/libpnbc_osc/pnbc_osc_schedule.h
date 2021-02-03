@@ -152,7 +152,6 @@ struct PNBC_OSC_Schedule {
   any_args_t *action_args_list;         // for trigger-based schedule
   int number_of_rounds;                 // length of array: rounds
   int restart_round;                    // index into array: rounds
-  PNBC_OSC_Round *rounds[];             // list of rounds (polymorphic)
 };
 typedef struct PNBC_OSC_Schedule PNBC_OSC_Schedule;
 OBJ_CLASS_DECLARATION(PNBC_OSC_Schedule);

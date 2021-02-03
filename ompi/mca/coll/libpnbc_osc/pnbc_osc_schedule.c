@@ -32,7 +32,7 @@ static void PNBC_OSC_Schedule_constructor (PNBC_OSC_Schedule *schedule) {
   /* initial total size of the schedule */
   schedule->size = sizeof (int);
   schedule->current_round_offset = 0;
-  schedule->data = calloc (1, schedule->size);
+  schedule->data = NULL;
 }
 
 static void PNBC_OSC_Schedule_destructor (PNBC_OSC_Schedule *schedule) {
@@ -356,6 +356,10 @@ int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator
                                   bool persistent, ompi_request_t **request) {
   bool need_register = false;
   ompi_coll_libpnbc_osc_request_t *handle;
+  int ret;
+
+  PNBC_OSC_DEBUG(10, "Schedule Request (0)\n");
+
 
   OMPI_COLL_LIBPNBC_OSC_REQUEST_ALLOC(comm, persistent, handle);
   if (NULL == handle) return OMPI_ERR_OUT_OF_RESOURCE;
@@ -380,7 +384,14 @@ int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator
     int32_t tmp =
       OPAL_THREAD_ADD_FETCH32(&mca_coll_libpnbc_osc_component.active_comms, 1);
     if (tmp == 1) {
-      opal_progress_register(ompi_coll_libpnbc_osc_progress);
+      PNBC_OSC_DEBUG(10, "Schedule Request (1)\n");
+      ret = opal_progress_register(ompi_coll_libpnbc_osc_progress);
+      if (OMPI_SUCCESS != ret) {
+        PNBC_OSC_DEBUG(10, "FAiled TO REGISTER\n");
+      }
+      else{
+	PNBC_OSC_DEBUG(10, "Register Succeeded\n");
+      }
     }
   }
 

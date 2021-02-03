@@ -392,6 +392,9 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   }
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d created top-level request\n",
                      crank);
+  if(((ompi_coll_libpnbc_osc_request_t*)(*request))->win!=MPI_WIN_NULL){
+    PNBC_OSC_DEBUG(10, "Window has not been free'd\n");
+  }
 
   return OMPI_SUCCESS;
 }
@@ -409,8 +412,10 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   int res = OMPI_SUCCESS;
 
   //schedule = OBJ_NEW(PNBC_OSC_Schedule);
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 0\n", crank);
 
-  schedule->triggers = malloc(6 * csize * sizeof(triggerable_t));
+  schedule->triggers_length = 6 * csize;
+  schedule->triggers = malloc(schedule->triggers_length * sizeof(triggerable_t));
   triggerable_t *triggers_phase0 = &(schedule->triggers[0 * csize * sizeof(triggerable_t)]);
   triggerable_t *triggers_phase1 = &(schedule->triggers[1 * csize * sizeof(triggerable_t)]);
   triggerable_t *triggers_phase2 = &(schedule->triggers[2 * csize * sizeof(triggerable_t)]);
@@ -433,12 +438,17 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   MPI_Aint *FLAG_displs_other = &flag_displs_other[0 * csize * sizeof(MPI_Aint)]; // set remotely, copied into put_args
   MPI_Aint *DONE_displs_other = &flag_displs_other[1 * csize * sizeof(MPI_Aint)]; // set remotely, copied into put_args
 
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 1\n", crank);
+
   for (int i=0;i<csize;++i) {
     MPI_Get_address(&flags_rma_put_FLAG[i], &FLAG_displs_local[i]);
     MPI_Get_address(&flags_rma_put_DONE[i], &DONE_displs_local[i]);
   }
   MPI_Alltoall(flag_displs_local, 2*csize, MPI_AINT, flag_displs_other, 2*csize, MPI_AINT, comm);
+
   schedule->flags_length = 2*csize*sizeof(FLAG_t); // size of memory to expose to other ranks via window
+
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 2\n", crank);
 
   schedule->requests = malloc(3 * csize * sizeof(MPI_Request*));
   MPI_Request **requests_rputFLAG = &(schedule->requests[0 * csize * sizeof(MPI_Request*)]); // circumvent the request?
@@ -451,9 +461,13 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   any_args_t *action_args_DONE = &(schedule->action_args_list[2 * csize * sizeof(any_args_t)]);
 
   // schedule->trigger_arrays = malloc(6 * sizeof(triggerable_array)); // TODO:replace csize*triggerable_single with triggerable_array
+  
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 3\n", crank);
+
 
   for (int p=0;p<csize;++p) {
     int orank = (crank+p)%csize;
+    PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 3.1\n", crank);
 
     // set 0 - triggered by: local start (responds to action from local user)
     //         trigger: reset all triggers, including schedule->triggers_active = 3*csize
@@ -514,6 +528,9 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
       args->request = requests_rputDONE[orank];
     }
 
+    PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 3.2\n", crank);
+
+
     // set 3 - triggered by: local test (completes the action from local set 0)
     //         trigger: MPI_Test(requests_rputFLAG[orank], &flags_request_FLAG[orank]);
     //         action: update local progress counter
@@ -522,6 +539,8 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase3[orank].test_cbstate = requests_rputFLAG[orank];
     triggers_phase3[orank].action = action_all_decrement_int_p;
     triggers_phase3[orank].action_cbstate = &(schedule->triggers_active);
+
+    PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 3.3\n", crank);
 
     // set 4 - triggered by: local test (completes the action from local set 2)
     //         trigger: MPI_Test(requests_rputDONE[orank], &flags_request_DONE[orank]);
@@ -532,6 +551,8 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase4[orank].action = action_all_decrement_int_p;
     triggers_phase4[orank].action_cbstate = &(schedule->triggers_active);
 
+    PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 3.4\n", crank);
+
     // set 5 - triggered by: remote rma put (responds to action from remote set 2)
     //         trigger: set local DONE integer to non-zero value
     //         action: update local progress counter
@@ -540,7 +561,11 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     triggers_phase5[orank].action = action_all_decrement_int_p;
     triggers_phase5[orank].action_cbstate = &(schedule->triggers_active);
 
+    PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 3.5\n", crank);
+
   }
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule (end)\n", crank);
+
 
   free(flag_displs); // all remote values are now stored in put_args structs, we can get rid of this temp space
 

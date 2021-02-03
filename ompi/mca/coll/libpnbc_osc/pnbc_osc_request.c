@@ -54,7 +54,7 @@ request_start(size_t count, ompi_request_t ** requests)
 {
     int res;
     size_t i;
-
+//todo: change debug messages
     PNBC_OSC_DEBUG(5, " ** request_start **\n");
 
     for (i = 0; i < count; i++) {
