@@ -127,11 +127,15 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   }
 
   // create a dynamic window - data here will be accessed by remote processes
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d creating dynamic window...\n",
+                 crank);
   res = ompi_win_create_dynamic(&info->super, comm, &win);
   if (OMPI_SUCCESS != res) {
     PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
     return res;
   }
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d created dynamic window\n",
+                 crank);
 
   switch (algo) {
 
