@@ -29,15 +29,11 @@
 #include "pnbc_osc_schedule.h"
 
 static void PNBC_OSC_Schedule_constructor (PNBC_OSC_Schedule *schedule) {
-  /* initial total size of the schedule */
-  schedule->size = sizeof (int);
-  schedule->current_round_offset = 0;
-  schedule->data = NULL;
+  // nothing needed here
 }
 
 static void PNBC_OSC_Schedule_destructor (PNBC_OSC_Schedule *schedule) {
-  free (schedule->data);
-  schedule->data = NULL;
+  // TODO make sure referenced objects are destroyed and referenced memory is freed
 }
 
 OBJ_CLASS_INSTANCE(PNBC_OSC_Schedule, opal_object_t,

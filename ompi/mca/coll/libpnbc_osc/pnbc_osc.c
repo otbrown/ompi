@@ -60,13 +60,6 @@ int PNBC_OSC_Progress(PNBC_OSC_Handle *handle) {
 
   enum TRIGGER_ACTION_STATE state;
 
-  // assume trigger-based - old NBC-data way is an error
-  if (OPAL_UNLIKELY(NULL != handle->schedule->data)) {
-    PNBC_OSC_DEBUG(10, "NULL (0)\n");
-    return OMPI_ERR_BAD_PARAM;
-  }
-
-
   // protection against progression error - should never happen
   if (OPAL_UNLIKELY(OMPI_REQUEST_ACTIVE != handle->super.req_state)) {
     PNBC_OSC_DEBUG(10, "NULL (2)\n");
