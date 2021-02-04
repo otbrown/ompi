@@ -5,7 +5,7 @@
 static enum TRIGGER_ACTION_STATE action_all_get(get_args_t *get_args) {
   int ret = ACTION_SUCCESS;
 
-PNBC_OSC_DEBUG(10, "Hi from action get!\n");
+PNBC_OSC_DEBUG(10, "Hello from action get!\n");
 PNBC_OSC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, target displ: %lu)\n",
                      get_args->buf, get_args->origin_count, get_args->origin_datatype, get_args->target,
                      get_args->target_count, get_args->target_datatype, get_args->target_displ);
@@ -13,9 +13,7 @@ PNBC_OSC_DEBUG(5,"*buf: %p, origin count: %i, origin type: %p, target: %i, targe
 #ifdef PNBC_OSC_TIMING
       Iget_time -= MPI_Wtime();
 #endif
-      if (get_args->target==1){
-        sleep(5000);
-      }
+
       ret = get_args->win->w_osc_module->osc_rget(get_args->buf,
                                                 get_args->origin_count, get_args->origin_datatype,
                                                 get_args->target, get_args->target_displ,

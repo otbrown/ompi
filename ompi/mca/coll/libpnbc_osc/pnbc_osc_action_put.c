@@ -5,7 +5,9 @@
 static enum TRIGGER_ACTION_STATE action_all_put(put_args_t *put_args){
   int ret = ACTION_SUCCESS;
 
-  PNBC_OSC_DEBUG(10, "Hello from action put!\n");
+
+  //DATA TYPE SHOULD BE POINTER, ptrdiff_t ? is this MPI_Aint? 
+  PNBC_OSC_DEBUG(10, "Hello from action put! Given cbstate %p\n", put_args);
 PNBC_OSC_DEBUG(10,"*buf: %p, origin count: %i, origin type: %p, target: %i, target count: %i, target type: %p, target displ: %lu)\n",
                      put_args->buf, put_args->origin_count, put_args->origin_datatype, put_args->target,
                      put_args->target_count, put_args->target_datatype, put_args->target_displ);
@@ -13,9 +15,6 @@ PNBC_OSC_DEBUG(10,"*buf: %p, origin count: %i, origin type: %p, target: %i, targ
 #ifdef PNBC_OSC_TIMING
       Iput_time -= MPI_Wtime();
 #endif
-  if (put_args->target==1){
-    sleep(5000);
-  }
 
 
   ret = put_args->win->w_osc_module->osc_rput(put_args->buf,

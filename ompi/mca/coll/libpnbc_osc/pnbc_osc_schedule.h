@@ -42,7 +42,7 @@ BEGIN_C_DECLS
 */
 struct PNBC_OSC_Schedule {
   opal_object_t super;
-  int triggers_active;                  // for trigger-based schedule
+  long triggers_active;                  // for trigger-based schedule
   int triggers_length;                  // for trigger-based schedule
   triggerable_t *triggers;              // for trigger-based schedule
   int trigger_arrays_length;            // for trigger-based schedule

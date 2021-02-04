@@ -26,6 +26,7 @@
  */
 #include "pnbc_osc_debug.h"
 #include "pnbc_osc_internal.h"
+#include "pnbc_osc_trigger_common.h"
 
 /* should be moved into pnbc_osc_request.c */
 int PNBC_OSC_Start(PNBC_OSC_Handle *handle) {
@@ -38,6 +39,14 @@ int PNBC_OSC_Start(PNBC_OSC_Handle *handle) {
   // bozo case - starting an active request is erroneous
   if (OPAL_UNLIKELY(OMPI_REQUEST_ACTIVE == handle->super.req_state)) {
     return OMPI_ERR_BAD_PARAM;
+  }
+  //TODO: Loop over all trigger arrays and reset
+  //TODO: Reset triggers 
+
+  PNBC_OSC_DEBUG(10, "[pnbc_osc]\n ");
+  for(int t=0;t<handle->schedule->triggers_length;t++) {
+    PNBC_OSC_DEBUG(10, "[pnbc_osc] about to reset trigger @ %p\n",&handle->schedule->triggers[t]);
+    trigger_reset(&handle->schedule->triggers[t]);
   }
 
   // change state of request to ACTIVE, permits progress for this request
