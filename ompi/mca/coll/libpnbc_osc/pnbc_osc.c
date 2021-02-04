@@ -66,9 +66,11 @@ int PNBC_OSC_Progress(PNBC_OSC_Handle *handle) {
     return OMPI_ERR_BAD_PARAM;
   }
   
+  
   PNBC_OSC_DEBUG(10, "Triggers_Length: %d\n",handle->schedule->triggers_length);
   // test each triggerable in the schedule
   for (int t=0;t<handle->schedule->triggers_length;++t) {
+    PNBC_OSC_DEBUG(10, "About to test trigger @: %p, %d\n",&(handle->schedule->triggers[t]),t);
     state = trigger_test(&(handle->schedule->triggers[t]));
     if (OPAL_UNLIKELY(ACTION_PROBLEM == state)) {
       PNBC_OSC_DEBUG(10, "RTRN 1\n");

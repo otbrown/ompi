@@ -418,6 +418,8 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   schedule->triggers = malloc(schedule->triggers_length * sizeof(triggerable_t));
   triggerable_t *triggers_phase0 = &(schedule->triggers[0 * csize * sizeof(triggerable_t)]);
   triggerable_t *triggers_phase1 = &(schedule->triggers[1 * csize * sizeof(triggerable_t)]);
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d, Trigger phase 1 starts at %p\n", crank, triggers_phase1);
+
   triggerable_t *triggers_phase2 = &(schedule->triggers[2 * csize * sizeof(triggerable_t)]);
   triggerable_t *triggers_phase3 = &(schedule->triggers[3 * csize * sizeof(triggerable_t)]);
   triggerable_t *triggers_phase4 = &(schedule->triggers[4 * csize * sizeof(triggerable_t)]);
@@ -492,12 +494,18 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     // set 1 - triggered by: remote rma put (responds to action from remote set 0)
     //         trigger: set local FLAG integer to non-zero value
     //         action: get DATA from remote into local output buffer
+
     triggers_phase1[orank].trigger = &flags_rma_put_FLAG[orank];
+
+    PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d: Setting trigger value to %p\n", crank, &flags_rma_put_FLAG[orank]);
+
+
     triggers_phase1[orank].test = &triggered_all_bynonzero_int;
     triggers_phase1[orank].action = action_all_get_p;
     triggers_phase1[orank].action_cbstate = &action_args_DATA[orank];
     {
       get_args_t *args = &(action_args_DATA[orank].get_args);
+      //TODO: verify (501) arithmetic
       args->buf = (void*)&(((char*)recvbuf)[recvext*orank]);
       args->origin_count = args->target_count = recvcounts[orank];
       args->origin_datatype = args->target_datatype = recvtype;
