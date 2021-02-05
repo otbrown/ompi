@@ -41,8 +41,6 @@ static const char FUNC_NAME[] = "MPI_Wait";
 
 int MPI_Wait(MPI_Request *request, MPI_Status *status)
 {
- 
-    fprintf(stderr,"Entered MPI_WAIT\n");
     SPC_RECORD(OMPI_SPC_WAIT, 1);
 
     MEMCHECKER(
@@ -53,14 +51,12 @@ int MPI_Wait(MPI_Request *request, MPI_Status *status)
         int rc = MPI_SUCCESS;
         OMPI_ERR_INIT_FINALIZE(FUNC_NAME);
         if (request == NULL) {
-	    printf("Request=null\n");
             rc = MPI_ERR_REQUEST;
         }
         OMPI_ERRHANDLER_NOHANDLE_CHECK(rc, rc, FUNC_NAME);
     }
 
     if (MPI_REQUEST_NULL == *request) {
-        printf("*request\n");
         if (MPI_STATUS_IGNORE != status) {
             *status = ompi_status_empty;
             /*
@@ -72,7 +68,7 @@ int MPI_Wait(MPI_Request *request, MPI_Status *status)
         }
         return MPI_SUCCESS;
     }
-    printf("Everything okay\n");
+
     OPAL_CR_ENTER_LIBRARY();
 
     if (OMPI_SUCCESS == ompi_request_wait(request, status)) {
