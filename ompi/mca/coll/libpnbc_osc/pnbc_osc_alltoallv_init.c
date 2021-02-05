@@ -131,7 +131,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                  crank);
   res = ompi_win_create_dynamic(&info->super, comm, &win);
   if (OMPI_SUCCESS != res) {
-    PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
+    PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)\n", res);
     return res;
   }
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d created dynamic window\n",
@@ -185,13 +185,13 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // attach all of the local sendbuf to local window as one large chunk of memory
       res = win->w_osc_module->osc_win_attach(win, (char*)sendbuf, end_of_sendbuf);
       if (OMPI_SUCCESS != res) {
-        PNBC_OSC_Error ("MPI Error in win_attach (%i)", res);
+        PNBC_OSC_Error ("MPI Error in sendbuf win_attach (%i)\n", res);
         free(abs_sdispls_other);
         free(abs_sdispls_local);
         MPI_Win_free(&win);
         return res;
       }
-      PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d attached to dynamic window memory for all ranks with address %p of size %d bytes\n",
+      PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d attached sendbuf to dynamic window memory for all ranks with address %p of size %d bytes\n",
                      crank,
                      (char*)sendbuf,
                      end_of_sendbuf);
@@ -203,7 +203,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                                         abs_sdispls_other, csize, MPI_AINT,
                                         comm, comm->c_coll->coll_alltoall_module);
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        PNBC_OSC_Error ("MPI Error in alltoall for sdispls (%i)", res);
+        PNBC_OSC_Error ("MPI Error in alltoall for sdispls (%i)\n", res);
         free(abs_sdispls_other);
         free(abs_sdispls_local);
         MPI_Win_free(&win);
@@ -213,7 +213,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                      crank);
 
       // the local absolute displacement values for portions of sendbuf are only needed remotely
-      free(abs_sdispls_local);
+      //free(abs_sdispls_local);
 
       // ****************************
       // GET_BASED WINDOW SETUP - END
@@ -225,14 +225,16 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                                     sendbuf, sendcounts, sdispls, sendext, sendtype,
                                     recvbuf, recvcounts, rdispls, recvext, recvtype,
                                     abs_sdispls_other);
+
+      free(abs_sdispls_other);
+
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)", res);
-        free(abs_sdispls_other);
-        free(abs_sdispls_local);
         MPI_Win_free(&win);
         OBJ_RELEASE(schedule);
         return res;
       }
+
 
       break;
 
@@ -271,13 +273,13 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       for (int r=0;r<csize;++r) {
         res = win->w_osc_module->osc_win_attach(win, (char*)recvbuf+(recvext*rdispls[r]), recvext*recvcounts[r]);
         if (OMPI_SUCCESS != res) {
-          PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
+          PNBC_OSC_Error ("MPI Error in recvbuf win_attach (%i)\n", res);
           free(abs_rdispls_other);
           free(abs_rdispls_local);
           MPI_Win_free(&win);
           return res;
         }
-        PNBC_OSC_DEBUG(1, "[pnbc_alltoallv_init] %d attached to dynamic window memory for rank %d with address %p (computed from rdispl value %d) of size %d bytes (computed from recvcount value %d)\n",
+        PNBC_OSC_DEBUG(1, "[pnbc_alltoallv_init] %d attached recv buf to dynamic window memory for rank %d with address %p (computed from rdispl value %d) of size %d bytes (computed from recvcount value %d)\n",
                        crank, r,
                        (char*)recvbuf+(recvext*rdispls[r]),
                        rdispls[r],
@@ -324,10 +326,11 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                                     sendbuf, sendcounts, sdispls, sendext, sendtype,
                                     recvbuf, recvcounts, rdispls, recvext, recvtype,
                                     abs_rdispls_other);
+
+      free(abs_rdispls_other);
+
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)", res);
-        free(abs_rdispls_other);
-        free(abs_rdispls_local);
         MPI_Win_free(&win);
         OBJ_RELEASE(schedule);
         return res;
@@ -347,9 +350,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
     PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Flags are at location %p with length %d (attached)\n", crank, schedule->flags, schedule->flags_length);
     res = win->w_osc_module->osc_win_attach(win, schedule->flags, schedule->flags_length);
     if (OMPI_SUCCESS != res) {
-      PNBC_OSC_Error ("MPI Error in win_create_dynamic (%i)", res);
-      free(abs_rdispls_other);
-      free(abs_rdispls_local);
+      PNBC_OSC_Error ("MPI Error in flag win_attach (%i)\n", res);
       MPI_Win_free(&win);
       OBJ_RELEASE(schedule);
       return res;
@@ -362,8 +363,6 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   res = MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
   if (OMPI_SUCCESS != res) {
     PNBC_OSC_Error ("MPI Error in MPI_Win_lock_all (%i)", res);
-    free(abs_rdispls_other);
-    free(abs_rdispls_local);
     MPI_Win_free(&win);
     return res;
   }
@@ -385,8 +384,6 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   res = PNBC_OSC_Schedule_request_win(schedule, comm, win, libpnbc_osc_module, persistent, request);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     PNBC_OSC_Error ("MPI Error in PNBC_OSC_Schedule_request_win (%i)", res);
-    free(abs_rdispls_other);
-    free(abs_rdispls_local);
     MPI_Win_free(&win);
     OBJ_RELEASE(schedule);
     return res;
