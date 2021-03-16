@@ -178,11 +178,13 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
        	PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d gets new end_of_sendbuf %d (end_of_this_bit %d)\n",
                        crank, end_of_sendbuf, end_of_this_bit);
         MPI_Get_address(((char*)sendbuf) + (sdispls[r]*sendext), &(abs_sdispls_local[r]));
-       	PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d gets address at %ld (from sdispl %d giving pointer %p)\n",
-                       crank, abs_sdispls_local[r], sdispls[r], ((char*)sendbuf)+(sdispls[r]*sendext));
+       	PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d (base %lu) gets address at %lu (from sdispl %d giving pointer %p)\n",
+                       crank, sendbuf, abs_sdispls_local[r], sdispls[r], ((char*)sendbuf)+(sdispls[r]*sendext));
+	PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d local displacement %lu\n",crank,abs_sdispls_local[r]);
       }
 
       // attach all of the local sendbuf to local window as one large chunk of memory
+
       res = win->w_osc_module->osc_win_attach(win, (char*)sendbuf, end_of_sendbuf);
       if (OMPI_SUCCESS != res) {
         PNBC_OSC_Error ("MPI Error in sendbuf win_attach (%i)\n", res);
@@ -199,9 +201,15 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // swap local sdispls for remote sdispls
       // put the displacements for all local portions on the window
       // get the displacements for all other portions on the window
-      res = comm->c_coll->coll_alltoall(abs_sdispls_local, csize, MPI_AINT,
-                                        abs_sdispls_other, csize, MPI_AINT,
+      res = comm->c_coll->coll_alltoall(abs_sdispls_local, 1, MPI_AINT,
+                                        abs_sdispls_other, 1, MPI_AINT,
                                         comm, comm->c_coll->coll_alltoall_module);
+
+      PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d My base sendbuf %lu \n", crank, &base_sendbuf);
+      for(int i=0;i<csize;i++){
+        PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d My send dspl (local,other) are %d, %lu, %lu \n", crank, i, abs_sdispls_local[i], abs_sdispls_other[i]);
+      }
+      
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
         PNBC_OSC_Error ("MPI Error in alltoall for sdispls (%i)\n", res);
         free(abs_sdispls_other);
@@ -300,8 +308,8 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // get the displacements for all other portions on the window
       PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d about to exchange local and other recv displacements using alltoall\n",
                      crank);
-      res = comm->c_coll->coll_alltoall(abs_rdispls_local, csize, MPI_AINT,
-                                        abs_rdispls_other, csize, MPI_AINT,
+      res = comm->c_coll->coll_alltoall(abs_rdispls_local, 1, MPI_AINT,
+                                        abs_rdispls_other, 1, MPI_AINT,
                                         comm, comm->c_coll->coll_alltoall_module);
       if (OMPI_SUCCESS != res) {
         PNBC_OSC_Error ("MPI Error in alltoall for rdispls (%i)", res);
@@ -397,7 +405,8 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   return OMPI_SUCCESS;
 }
 
-static const int FLAG_TRUE = !0;
+FLAG_t *FLAG_TRUE;
+//static const int FLAG_TRUE = !0;
 
 static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedule *schedule,
                                           MPI_Win win, MPI_Comm comm,
@@ -408,6 +417,8 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
                                           MPI_Aint *abs_sdispls_other) {
   // pull implies move means get and FLAG means RTS (ready to send)
   int res = OMPI_SUCCESS;
+  FLAG_TRUE = malloc(sizeof(FLAG_t));
+  *(long*)FLAG_TRUE = !(long)0;
 
   //schedule = OBJ_NEW(PNBC_OSC_Schedule);
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 0\n", crank);
@@ -473,9 +484,10 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 2\n", crank);
 
   schedule->requests = malloc(3 * csize * sizeof(MPI_Request*));
-  MPI_Request **requests_rputFLAG = &(schedule->requests[0 * csize]); // circumvent the request?
-  MPI_Request **requests_moveData = &(schedule->requests[1 * csize]); // combine into PUT_NOTIFY?
-  MPI_Request **requests_rputDONE = &(schedule->requests[2 * csize]); // combine into PUT_NOTIFY?
+  MPI_Request *requests_rputFLAG = &(schedule->requests[0 * csize]); // circumvent the request?
+  MPI_Request *requests_moveData = &(schedule->requests[1 * csize]); // combine into PUT_NOTIFY?
+  MPI_Request *requests_rputDONE = &(schedule->requests[2 * csize]); // combine into PUT_NOTIFY?
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %lu test request address %p\n",&requests_rputFLAG[0],(char*)requests_rputFLAG[0]);
 
   schedule->action_args_list = malloc(3 * csize * sizeof(any_args_t));
   any_args_t *action_args_FLAG = &(schedule->action_args_list[0 * csize]);
@@ -503,7 +515,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
 
     {
       put_args_t *args = &(action_args_FLAG[orank].put_args);
-      args->buf = &FLAG_TRUE;
+      args->buf = FLAG_TRUE;
       args->origin_count = 1;
       args->origin_datatype = MPI_LONG;
       args->target = orank;
@@ -511,7 +523,8 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
       args-> target_count = 1;
       args->target_datatype = MPI_LONG;
       args->win = win;
-      args->request = requests_rputFLAG[orank];
+      args->request = &requests_rputFLAG[orank];
+      PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %lu request address %p\n",&args->request,(char*)args->request);
     }
 
     // set 1 - triggered by: remote rma put (responds to action from remote set 0)
@@ -538,7 +551,8 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
       args->target = orank;
       args->target_displ = abs_sdispls_other[orank];
       args->win = win;
-      args->request = requests_moveData[orank];
+      args->request = &requests_moveData[orank];
+      PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %lu request address %p\n",&args->request,(char*)args->request);
     }
 
     // set 2 - triggered by: local test (completes the action from local set 1)
@@ -562,7 +576,9 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
       args-> target_count = 1;
       args->target_datatype = MPI_LONG;
       args->win = win;
-      args->request = requests_rputDONE[orank];
+      args->request = &requests_rputDONE[orank];
+      PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %lu request address %p\n",&args->request,(char*)args->request);
+
     }
 
     PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 3.2\n", crank);

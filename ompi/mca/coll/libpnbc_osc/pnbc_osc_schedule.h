@@ -49,7 +49,7 @@ struct PNBC_OSC_Schedule {
   triggerable_array *trigger_arrays;    // for trigger-based schedule
   FLAG_t *flags;                        // for trigger-based schedule
   int flags_length;                     // for tracking size of flags array
-  MPI_Request **requests;               // for trigger-based schedule
+  MPI_Request *requests;               // for trigger-based schedule
   any_args_t *action_args_list;         // for trigger-based schedule
 };
 typedef struct PNBC_OSC_Schedule PNBC_OSC_Schedule;
