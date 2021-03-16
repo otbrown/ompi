@@ -87,19 +87,19 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
 
   PNBC_OSC_IN_PLACE(sendbuf, recvbuf, inplace);
   if (inplace) {
-    PNBC_OSC_Error("Error: inplace not implemented for PNBC_OSC AlltoallV");
+    PNBC_OSC_Error("Error: inplace not implemented for PNBC_OSC AlltoallV\n");
     return OMPI_ERROR;
   }
 
   res = ompi_datatype_type_extent (recvtype, &recvext);
   if (MPI_SUCCESS != res) {
-    PNBC_OSC_Error("MPI Error in ompi_datatype_type_extent() (%i)", res);
+    PNBC_OSC_Error("MPI Error in ompi_datatype_type_extent() (%i)\n", res);
     return res;
   }
 
   res = ompi_datatype_type_extent (sendtype, &sendext);
   if (MPI_SUCCESS != res) {
-    PNBC_OSC_Error("MPI Error in ompi_datatype_type_extent() (%i)", res);
+    PNBC_OSC_Error("MPI Error in ompi_datatype_type_extent() (%i)\n", res);
     return res;
   }
 
@@ -152,7 +152,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // compute absolute displacement as MPI_AINT for the sendbuf pointer
       res = MPI_Get_address(sendbuf, &base_sendbuf);
       if (OMPI_SUCCESS != res) {
-        PNBC_OSC_Error ("MPI Error in MPI_Get_address (%i)", res);
+        PNBC_OSC_Error ("MPI Error in MPI_Get_address (%i)\n", res);
         MPI_Win_free(&win);
         return res;
       }
@@ -237,7 +237,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       free(abs_sdispls_other);
 
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)", res);
+        PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)\n", res);
         MPI_Win_free(&win);
         OBJ_RELEASE(schedule);
         return res;
@@ -259,7 +259,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       // compute absolute displacement as MPI_AINT for the recvbuf pointer
       res = MPI_Get_address(recvbuf, &base_recvbuf);
       if (OMPI_SUCCESS != res) {
-        PNBC_OSC_Error ("MPI Error in MPI_Get_address (%i)", res);
+        PNBC_OSC_Error ("MPI Error in MPI_Get_address (%i)\n", res);
         MPI_Win_free(&win);
         return res;
       }
@@ -312,7 +312,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
                                         abs_rdispls_other, 1, MPI_AINT,
                                         comm, comm->c_coll->coll_alltoall_module);
       if (OMPI_SUCCESS != res) {
-        PNBC_OSC_Error ("MPI Error in alltoall for rdispls (%i)", res);
+        PNBC_OSC_Error ("MPI Error in alltoall for rdispls (%i)\n", res);
         free(abs_rdispls_other);
         free(abs_rdispls_local);
         MPI_Win_free(&win);
@@ -338,7 +338,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       free(abs_rdispls_other);
 
       if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-        PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)", res);
+        PNBC_OSC_Error ("MPI Error in a2av_sched_linear (%i)\n", res);
         MPI_Win_free(&win);
         OBJ_RELEASE(schedule);
         return res;
@@ -370,7 +370,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   // lock the flags window at all other processes
   res = MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
   if (OMPI_SUCCESS != res) {
-    PNBC_OSC_Error ("MPI Error in MPI_Win_lock_all (%i)", res);
+    PNBC_OSC_Error ("MPI Error in MPI_Win_lock_all (%i)\n", res);
     MPI_Win_free(&win);
     return res;
   }
@@ -391,7 +391,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
 
   res = PNBC_OSC_Schedule_request_win(schedule, comm, win, libpnbc_osc_module, persistent, request);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
-    PNBC_OSC_Error ("MPI Error in PNBC_OSC_Schedule_request_win (%i)", res);
+    PNBC_OSC_Error ("MPI Error in PNBC_OSC_Schedule_request_win (%i)\n", res);
     MPI_Win_free(&win);
     OBJ_RELEASE(schedule);
     return res;
