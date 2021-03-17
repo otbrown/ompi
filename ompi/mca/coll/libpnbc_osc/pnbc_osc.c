@@ -82,6 +82,13 @@ int PNBC_OSC_Progress(PNBC_OSC_Handle *handle) {
     PNBC_OSC_DEBUG(10, "About to test trigger @: %p, %d\n",&(handle->schedule->triggers[t]),t);
     state = trigger_test(&(handle->schedule->triggers[t]));
     PNBC_OSC_DEBUG(10, "TRIGGER TESTED: %p, %d\n",&(handle->schedule->triggers[t]),t);
+
+    if(handle->schedule->triggers_active==0){
+      handle->super.req_state=OMPI_REQUEST_INACTIVE;
+      PNBC_OSC_DEBUG(10, "NO MORE TRIGGERS ACTIVE -- SETTING REQUEST TO INACTIVE");
+    }
+
+    PNBC_OSC_DEBUG(10, "Triggers_Active: %d\n",handle->schedule->triggers_active);
     if (OPAL_UNLIKELY(ACTION_PROBLEM == state)) {
       PNBC_OSC_DEBUG(10, "RTRN 1\n");
       return OMPI_ERR_NOT_SUPPORTED;
@@ -97,6 +104,11 @@ int PNBC_OSC_Progress(PNBC_OSC_Handle *handle) {
       return OMPI_ERR_NOT_SUPPORTED;
     }
   }
+
+  //if(handle->schedule->triggers_active==0){
+  //  handle->super.req_state=OMPI_REQUEST_INACTIVE;
+  //}
+
 
   // check new state of this request (will eventually have been changed by a trigger)
   if (OMPI_REQUEST_ACTIVE != handle->super.req_state) { 

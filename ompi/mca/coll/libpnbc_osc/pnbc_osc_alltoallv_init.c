@@ -545,7 +545,9 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     {
       get_args_t *args = &(action_args_DATA[orank].get_args);
       //TODO: verify (501) arithmetic
-      args->buf = (void*)&(((char*)recvbuf)[recvext*orank]);
+      //MPI_Get_address(((char*)recvbuf) + (rdispls[r]*recvext), &(abs_rdispls_local[r]));
+      args->buf = (void*)&(((char*)recvbuf)[rdispls[orank]*recvext]);
+      //args->buf = (void*)&(((char*)recvbuf)[recvext*orank]);
       args->origin_count = args->target_count = recvcounts[orank];
       args->origin_datatype = args->target_datatype = recvtype;
       args->target = orank;
@@ -560,7 +562,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     //         action: put DONE signalling data movement is complete; a portion of buffers are usable
     triggers_phase2[orank].trigger = &flags_request_DATA[orank];
     triggers_phase2[orank].test = &triggered_all_byrequest_flag;
-    triggers_phase2[orank].test_cbstate = requests_moveData[orank];
+    triggers_phase2[orank].test_cbstate = &requests_moveData[orank];
     triggers_phase2[orank].action = action_all_put_p;
     triggers_phase2[orank].action_cbstate = &action_args_DONE[orank];
     
@@ -589,7 +591,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     //         action: update local progress counter
     triggers_phase3[orank].trigger = &flags_request_FLAG[orank];
     triggers_phase3[orank].test = &triggered_all_byrequest_flag;
-    triggers_phase3[orank].test_cbstate = requests_rputFLAG[orank];
+    triggers_phase3[orank].test_cbstate = &requests_rputFLAG[orank];
     triggers_phase3[orank].action = action_all_decrement_int_p;
     triggers_phase3[orank].action_cbstate = &(schedule->triggers_active);
 
@@ -602,7 +604,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
     //         action: update local progress counter
     triggers_phase4[orank].trigger = &flags_request_DONE[orank];
     triggers_phase4[orank].test = &triggered_all_byrequest_flag;
-    triggers_phase4[orank].test_cbstate = requests_rputDONE[orank];
+    triggers_phase4[orank].test_cbstate = &requests_rputDONE[orank];
     triggers_phase4[orank].action = action_all_decrement_int_p;
     triggers_phase4[orank].action_cbstate = &(schedule->triggers_active);
 
