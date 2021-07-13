@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 /* the debug level */
-#define PNBC_OSC_DLEVEL 10
+#define PNBC_OSC_DLEVEL 0
 #define PNBC_OSC_TIMING
 #undef PNBC_OSC_TIMING
 

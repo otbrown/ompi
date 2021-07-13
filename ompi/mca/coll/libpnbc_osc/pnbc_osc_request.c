@@ -29,12 +29,15 @@ request_construct(ompi_coll_libpnbc_osc_request_t *request)
 static void
 request_destruct(ompi_coll_libpnbc_osc_request_t *request)
 {
+  PNBC_OSC_DEBUG(5, " ** request_destruct **\n");
   if (NULL != request->schedule)
     OBJ_DESTRUCT(request->schedule);
-  if (MPI_WIN_NULL != request->win) {
-    MPI_Win_unlock_all(request->win);
-    OBJ_DESTRUCT(request->win);
-  }
+  //if (MPI_WIN_NULL != request->win) {
+    //PNBC_OSC_DEBUG(5, " ** unlocking window at %p **\n", request->win);
+    //MPI_Win_unlock_all(request->win);
+    //PNBC_OSC_DEBUG(5, " ** unlocked window at %p **\n", request->win);
+    //OBJ_DESTRUCT(request->win);
+ // }
 }
 
 static int
@@ -103,6 +106,7 @@ request_free(struct ompi_request_t **ompi_req)
 void PNBC_OSC_Free (ompi_coll_libpnbc_osc_request_t* handle) {
 
   if (NULL != handle->schedule) {
+    PNBC_OSC_DEBUG(5, " ** setting schedule to null **\n");
     /* release schedule */
     OBJ_RELEASE (handle->schedule);
     handle->schedule = NULL;

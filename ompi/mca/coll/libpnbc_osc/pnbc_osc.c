@@ -44,10 +44,14 @@ int PNBC_OSC_Start(PNBC_OSC_Handle *handle) {
   //TODO: Reset triggers 
 
   PNBC_OSC_DEBUG(10, "[pnbc_osc]\n ");
-  for(int t=0;t<handle->schedule->triggers_length;t++) {
-    PNBC_OSC_DEBUG(10, "[pnbc_osc] about to reset trigger @ %p\n",&handle->schedule->triggers[t]);
-    trigger_reset(&handle->schedule->triggers[t]);
+  if (handle->schedule->current==-1){
+    handle->schedule->current=0;
+    for(int t=0;t<handle->schedule->triggers_length;t++) {
+      PNBC_OSC_DEBUG(10, "[pnbc_osc] about to reset trigger @ %p\n",&handle->schedule->triggers[t]);
+      trigger_reset(&handle->schedule->triggers[t]);
+    }
   }
+  
 
   // change state of request to ACTIVE, permits progress for this request
   handle->super.req_state = OMPI_REQUEST_ACTIVE;
@@ -78,14 +82,29 @@ int PNBC_OSC_Progress(PNBC_OSC_Handle *handle) {
   
   PNBC_OSC_DEBUG(10, "Triggers_Length: %d\n",handle->schedule->triggers_length);
   // test each triggerable in the schedule
-  for (int t=0;t<handle->schedule->triggers_length;++t) {
+  for (int t=handle->schedule->current;t<handle->schedule->triggers_length;++t) {
     PNBC_OSC_DEBUG(10, "About to test trigger @: %p, %d\n",&(handle->schedule->triggers[t]),t);
     state = trigger_test(&(handle->schedule->triggers[t]));
+    PNBC_OSC_DEBUG(10, "Tested: %d, %d, %d\n",t,handle->schedule->triggers_active, state);
     PNBC_OSC_DEBUG(10, "TRIGGER TESTED: %p, %d\n",&(handle->schedule->triggers[t]),t);
+    if(state==-1){
+      handle->schedule->current = t;
+      return PNBC_OSC_CONTINUE;
+    }
+    trigger_reset(&handle->schedule->triggers[t]);
+
 
     if(handle->schedule->triggers_active==0){
+     // handle->nbc_complete = true;
+      //h/andle->schedule->current = 0;
+      //return 0;
+      //handle->nbc_complete = true;
+      //return 0;
+      handle->schedule->current = 0;
+      handle->schedule->triggers_active=9;
       handle->super.req_state=OMPI_REQUEST_INACTIVE;
-      PNBC_OSC_DEBUG(10, "NO MORE TRIGGERS ACTIVE -- SETTING REQUEST TO INACTIVE");
+      PNBC_OSC_DEBUG(10, "NO MORE TRIGGERS ACTIVE -- SETTING REQUEST TO INACTIVE\n");
+      return PNBC_OSC_SUCCESS;
     }
 
     PNBC_OSC_DEBUG(10, "Triggers_Active: %d\n",handle->schedule->triggers_active);

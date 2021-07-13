@@ -398,6 +398,9 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   }
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d created top-level request\n",
                      crank);
+  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] window at %p\n",
+                     win);
+
   if(((ompi_coll_libpnbc_osc_request_t*)(*request))->win!=MPI_WIN_NULL){
     PNBC_OSC_DEBUG(10, "Window has not been free'd\n");
   }
@@ -417,6 +420,7 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
                                           MPI_Aint *abs_sdispls_other) {
   // pull implies move means get and FLAG means RTS (ready to send)
   int res = OMPI_SUCCESS;
+  schedule->current = -1;
   FLAG_TRUE = malloc(sizeof(FLAG_t));
   *(long*)FLAG_TRUE = !(long)0;
 

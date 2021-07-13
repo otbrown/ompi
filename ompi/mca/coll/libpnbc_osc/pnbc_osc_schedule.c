@@ -59,7 +59,6 @@ int PNBC_OSC_Schedule_request_win(PNBC_OSC_Schedule *schedule, ompi_communicator
   handle->schedule = schedule;
   handle->comm = comm;
   handle->win = win;
-
   /******************** Do the shadow comm administration ...  ***************/
 
   OPAL_THREAD_LOCK(&module->mutex);
