@@ -2,7 +2,7 @@
 # Copyright (c) 2004-2005 The Trustees of Indiana University and Indiana
 #                         University Research and Technology
 #                         Corporation.  All rights reserved.
-# Copyright (c) 2004-2005 The University of Tennessee and The University
+# Copyright (c) 2004-2020 The University of Tennessee and The University
 #                         of Tennessee Research Foundation.  All rights
 #                         reserved.
 # Copyright (c) 2004-2009 High Performance Computing Center Stuttgart,
@@ -32,9 +32,7 @@ sources = \
     btl_tcp_frag.h \
     btl_tcp_hdr.h \
     btl_tcp_proc.c \
-    btl_tcp_proc.h \
-    btl_tcp_ft.c \
-    btl_tcp_ft.h
+    btl_tcp_proc.h
 
 # Make the output library in this directory, and name it either
 # mca_<type>_<name>.la (for DSO builds) or libmca_<type>_<name>.la
@@ -57,8 +55,8 @@ mcacomponent_LTLIBRARIES = $(component)
 mca_btl_tcp_la_SOURCES = $(component_sources)
 mca_btl_tcp_la_LDFLAGS = -module -avoid-version
 if OPAL_cuda_support
-mca_btl_tcp_la_LIBADD = $(top_builddir)/opal/lib@OPAL_LIB_PREFIX@open-pal.la \
-    $(OPAL_TOP_BUILDDIR)/opal/mca/common/cuda/lib@OPAL_LIB_PREFIX@mca_common_cuda.la
+mca_btl_tcp_la_LIBADD = $(top_builddir)/opal/lib@OPAL_LIB_NAME@.la \
+    $(OPAL_TOP_BUILDDIR)/opal/mca/common/cuda/lib@OPAL_LIB_NAME@mca_common_cuda.la
 endif
 
 noinst_LTLIBRARIES = $(lib)

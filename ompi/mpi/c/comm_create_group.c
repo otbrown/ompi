@@ -73,7 +73,16 @@ int MPI_Comm_create_group (MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *ne
         return MPI_SUCCESS;
     }
 
-    OPAL_CR_ENTER_LIBRARY();
+#if OPAL_ENABLE_FT_MPI
+    /*
+     * An early check, so as to return early if we are using a broken
+     * communicator. This is not absolutely necessary since we will
+     * check for this, and other, error conditions during the operation.
+     */
+    if( OPAL_UNLIKELY(!ompi_comm_iface_create_check(comm, &rc)) ) {
+        OMPI_ERRHANDLER_RETURN(rc, comm, rc, FUNC_NAME);
+    }
+#endif
 
     rc = ompi_comm_create_group ((ompi_communicator_t *) comm, (ompi_group_t *) group,
                                  tag, (ompi_communicator_t **) newcomm);

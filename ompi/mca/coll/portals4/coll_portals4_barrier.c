@@ -14,16 +14,15 @@
 
 #include "ompi_config.h"
 
+#include "opal/util/bit_ops.h"
+
+#include "ompi/constants.h"
+#include "ompi/mca/coll/base/base.h"
+#include "ompi/mca/coll/coll.h"
+#include "ompi/mca/pml/pml.h"
+
 #include "coll_portals4.h"
 #include "coll_portals4_request.h"
-
-#include "mpi.h"
-#include "ompi/constants.h"
-#include "opal/util/bit_ops.h"
-#include "ompi/mca/pml/pml.h"
-#include "ompi/mca/coll/coll.h"
-#include "ompi/mca/coll/base/base.h"
-
 
 static int
 barrier_hypercube_top(struct ompi_communicator_t *comm,
@@ -271,7 +270,7 @@ ompi_coll_portals4_barrier_intra(struct ompi_communicator_t *comm,
 int
 ompi_coll_portals4_ibarrier_intra(struct ompi_communicator_t *comm,
         ompi_request_t **ompi_req,
-        struct mca_coll_base_module_2_3_0_t *module)
+        mca_coll_base_module_t *module)
 {
     int ret;
     mca_coll_portals4_module_t *portals4_module = (mca_coll_portals4_module_t*) module;

@@ -311,7 +311,7 @@ int mca_io_ompio_file_get_type_extent (ompi_file_t *fh,
 int mca_io_ompio_file_set_atomicity (ompi_file_t *fh,
                                      int flag)
 {
-    int tmp;
+    int tmp, ret = OMPI_SUCCESS;
     mca_common_ompio_data_t *data;
 
     data = (mca_common_ompio_data_t *) fh->f_io_selected_data;
@@ -335,10 +335,22 @@ int mca_io_ompio_file_set_atomicity (ompi_file_t *fh,
         return OMPI_ERROR;
     }
 
-    data->ompio_fh.f_atomicity = flag;
+    bool result;
+    if ( flag ) {
+        result = data->ompio_fh.f_fbtl->fbtl_check_atomicity(&data->ompio_fh);
+        if ( result ) {
+            data->ompio_fh.f_atomicity = flag;
+        }
+        else {
+            ret = MPI_ERR_IO;
+        }
+    }        
+    else {
+        data->ompio_fh.f_atomicity = flag;
+    }
     OPAL_THREAD_UNLOCK(&fh->f_lock);
 
-    return OMPI_SUCCESS;
+    return ret;
 }
 
 int mca_io_ompio_file_get_atomicity (ompi_file_t *fh,
@@ -507,6 +519,11 @@ int mca_io_ompio_file_get_byte_offset (ompi_file_t *fh,
     data = (mca_common_ompio_data_t *) fh->f_io_selected_data;
 
     OPAL_THREAD_LOCK(&fh->f_lock);
+    if ( data->ompio_fh.f_view_size == 0 ) {
+        *disp = 0;
+        OPAL_THREAD_UNLOCK(&fh->f_lock);
+        return OMPI_SUCCESS;
+    }
     temp_offset = (long) data->ompio_fh.f_view_extent *
         (offset*data->ompio_fh.f_etype_size / data->ompio_fh.f_view_size);
     if ( 0 > temp_offset ) {

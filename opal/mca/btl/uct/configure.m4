@@ -42,7 +42,7 @@ dnl check UCT version.  UCT API can change at any given release
 dnl so we only allow compiling against ones we know work.
 dnl
     AC_ARG_ENABLE([uct-version-check],
-       [AC_HELP_STRING([--enable-uct-version-check],
+       [AS_HELP_STRING([--enable-uct-version-check],
            [enable UCT version check (default: enabled)])])
     AC_MSG_CHECKING([check uct version])
     if test "$enable_uct_version_check" != "no"; then
@@ -52,7 +52,7 @@ dnl
     fi
 
     max_allowed_uct_major=1
-    max_allowed_uct_minor=8
+    max_allowed_uct_minor=9
     if test "$btl_uct_happy" = "yes" && test "$enable_uct_version_check" != "no"; then
         AC_MSG_CHECKING([UCT version compatibility])
         OPAL_VAR_SCOPE_PUSH([CPPFLAGS_save])

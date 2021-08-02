@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2006 The Trustees of Indiana University and Indiana
  *                         University Research and Technology
  *                         Corporation.  All rights reserved.
- * Copyright (c) 2004-2011 The University of Tennessee and The University
+ * Copyright (c) 2004-2016 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2004-2006 High Performance Computing Center Stuttgart,
@@ -11,6 +11,7 @@
  * Copyright (c) 2004-2006 The Regents of the University of California.
  *                         All rights reserved.
  * Copyright (c) 2006-2015 Cisco Systems, Inc.  All rights reserved.
+ * Copyright (c) 2010-2012 Oak Ridge National Labs.  All rights reserved.
  * Copyright (c) 2012-2015 Los Alamos National Security, LLC.  All rights
  *                         reserved.
  * Copyright (c) 2013-2020 Intel, Inc.  All rights reserved.
@@ -18,6 +19,7 @@
  *                         and Technology (RIST). All rights reserved.
  * Copyright (c) 2015-2017 Mellanox Technologies. All rights reserved.
  *
+ * Copyright (c) 2021      Nanook Consulting.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -33,7 +35,6 @@
 #include "ompi/constants.h"
 #include "opal/datatype/opal_convertor.h"
 #include "opal/mca/threads/mutex.h"
-#include "opal/dss/dss.h"
 #include "opal/util/arch.h"
 #include "opal/util/show_help.h"
 #include "opal/mca/hwloc/base/base.h"
@@ -66,6 +67,9 @@ OBJ_CLASS_INSTANCE(
 
 void ompi_proc_construct(ompi_proc_t* proc)
 {
+#if OPAL_ENABLE_FT_MPI
+    proc->proc_active = true;
+#endif
     bzero(proc->proc_endpoints, sizeof(proc->proc_endpoints));
 
     /* By default all processors are supposedly having the same architecture as me. Thus,
@@ -150,7 +154,7 @@ int ompi_proc_complete_init_single (ompi_proc_t *proc)
         } else {
             ui32ptr = &(proc->super.proc_arch);
             OPAL_MODEX_RECV_VALUE_OPTIONAL(ret, "OMPI_ARCH", &proc->super.proc_name,
-                                           (void**)&ui32ptr, OPAL_UINT32);
+                                           (void**)&ui32ptr, PMIX_UINT32);
             if (OPAL_SUCCESS == ret) {
                 /* if arch is different than mine, create a new convertor for this proc */
                 if (proc->super.proc_arch != opal_local_arch) {
@@ -263,7 +267,7 @@ int ompi_proc_init(void)
 #if OPAL_ENABLE_HETEROGENEOUS_SUPPORT
     /* add our arch to the modex */
     OPAL_MODEX_SEND_VALUE(ret, PMIX_GLOBAL,
-                          "OMPI_ARCH", &opal_local_arch, OPAL_UINT32);
+                          "OMPI_ARCH", &opal_local_arch, PMIX_UINT32);
     if (OPAL_SUCCESS != ret) {
         return ret;
     }
@@ -300,7 +304,7 @@ int ompi_proc_complete_init(void)
     opal_process_name_t wildcard_rank;
     ompi_proc_t *proc;
     int ret, errcode = OMPI_SUCCESS;
-    char *val;
+    char *val = NULL;
 
     opal_mutex_lock (&ompi_proc_lock);
 
@@ -618,7 +622,7 @@ int ompi_proc_refresh(void)
 
 int
 ompi_proc_pack(ompi_proc_t **proclist, int proclistsize,
-               opal_buffer_t* buf)
+               pmix_data_buffer_t* buf)
 {
     int rc;
     char *nspace;
@@ -639,33 +643,35 @@ ompi_proc_pack(ompi_proc_t **proclist, int proclistsize,
      */
     for (int i = 0 ; i < proclistsize ; ++i) {
         ompi_proc_t *proc = proclist[i];
+        pmix_proc_t prc;
 
         if (ompi_proc_is_sentinel (proc)) {
             proc = ompi_proc_for_name_nolock (ompi_proc_sentinel_to_name ((uintptr_t) proc));
         }
 
         /* send proc name */
-        rc = opal_dss.pack(buf, &(proc->super.proc_name), 1, OMPI_NAME);
-        if(rc != OPAL_SUCCESS) {
-            OMPI_ERROR_LOG(rc);
+        OPAL_PMIX_CONVERT_NAME(&prc, &(proc->super.proc_name));
+        rc = PMIx_Data_pack(NULL, buf, &prc, 1, PMIX_PROC);
+        if (PMIX_SUCCESS != rc) {
+            PMIX_ERROR_LOG(rc);
             opal_mutex_unlock (&ompi_proc_lock);
-            return rc;
+            return opal_pmix_convert_status(rc);
         }
         /* retrieve and send the corresponding nspace for this job
          * as the remote side may not know the translation */
         nspace = opal_jobid_print(proc->super.proc_name.jobid);
-        rc = opal_dss.pack(buf, &nspace, 1, OPAL_STRING);
-        if(rc != OPAL_SUCCESS) {
-            OMPI_ERROR_LOG(rc);
+        rc = PMIx_Data_pack(NULL, buf, &nspace, 1, PMIX_STRING);
+        if (PMIX_SUCCESS != rc) {
+            PMIX_ERROR_LOG(rc);
             opal_mutex_unlock (&ompi_proc_lock);
-            return rc;
+            return opal_pmix_convert_status(rc);
         }
         /* pack architecture flag */
-        rc = opal_dss.pack(buf, &(proc->super.proc_arch), 1, OPAL_UINT32);
-        if(rc != OPAL_SUCCESS) {
-            OMPI_ERROR_LOG(rc);
+        rc = PMIx_Data_pack(NULL, buf, &(proc->super.proc_arch), 1, PMIX_UINT32);
+        if (PMIX_SUCCESS != rc) {
+            PMIX_ERROR_LOG(rc);
             opal_mutex_unlock (&ompi_proc_lock);
-            return rc;
+            return opal_pmix_convert_status(rc);
         }
     }
     opal_mutex_unlock (&ompi_proc_lock);
@@ -704,7 +710,7 @@ ompi_proc_find_and_add(const ompi_process_name_t * name, bool* isnew)
 
 
 int
-ompi_proc_unpack(opal_buffer_t* buf,
+ompi_proc_unpack(pmix_data_buffer_t* buf,
                  int proclistsize, ompi_proc_t ***proclist,
                  int *newproclistsize, ompi_proc_t ***newproclist)
 {
@@ -730,33 +736,35 @@ ompi_proc_unpack(opal_buffer_t* buf,
     for (int i = 0; i < proclistsize ; ++i){
         int32_t count=1;
         ompi_process_name_t new_name;
+        pmix_proc_t prc;
         uint32_t new_arch;
         bool isnew = false;
         int rc;
         char *nspace;
         uint16_t u16, *u16ptr;
 
-        rc = opal_dss.unpack(buf, &new_name, &count, OMPI_NAME);
-        if (rc != OPAL_SUCCESS) {
-            OMPI_ERROR_LOG(rc);
+        rc = PMIx_Data_unpack(NULL, buf, &prc, &count, PMIX_PROC);
+        if (PMIX_SUCCESS != rc) {
+            PMIX_ERROR_LOG(rc);
             free(plist);
             free(newprocs);
-            return rc;
+            return opal_pmix_convert_status(rc);
         }
-        rc = opal_dss.unpack(buf, &nspace, &count, OPAL_STRING);
-        if (rc != OPAL_SUCCESS) {
-            OMPI_ERROR_LOG(rc);
+        OPAL_PMIX_CONVERT_PROCT(rc, &new_name, &prc);
+        rc = PMIx_Data_unpack(NULL, buf, &nspace, &count, PMIX_STRING);
+        if (PMIX_SUCCESS != rc) {
+            PMIX_ERROR_LOG(rc);
             free(plist);
             free(newprocs);
-            return rc;
+            return opal_pmix_convert_status(rc);
         }
         free(nspace);
-        rc = opal_dss.unpack(buf, &new_arch, &count, OPAL_UINT32);
-        if (rc != OPAL_SUCCESS) {
-            OMPI_ERROR_LOG(rc);
+        rc = PMIx_Data_unpack(NULL, buf, &new_arch, &count, PMIX_UINT32);
+        if (PMIX_SUCCESS != rc) {
+            PMIX_ERROR_LOG(rc);
             free(plist);
             free(newprocs);
-            return rc;
+            return opal_pmix_convert_status(rc);
         }
         /* see if this proc is already on our ompi_proc_list */
         plist[i] = ompi_proc_find_and_add(&new_name, &isnew);

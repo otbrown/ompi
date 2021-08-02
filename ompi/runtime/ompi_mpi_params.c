@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2005 The Trustees of Indiana University and Indiana
  *                         University Research and Technology
  *                         Corporation.  All rights reserved.
- * Copyright (c) 2004-2020 The University of Tennessee and The University
+ * Copyright (c) 2004-2021 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2004-2005 High Performance Computing Center Stuttgart,
@@ -13,12 +13,16 @@
  * Copyright (c) 2006-2016 Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2007-2015 Los Alamos National Security, LLC.  All rights
  *                         reserved.
+ * Copyright (c) 2010-2012 Oak Ridge National Labs.  All rights reserved.
  * Copyright (c) 2013      NVIDIA Corporation.  All rights reserved.
  * Copyright (c) 2013-2019 Intel, Inc.  All rights reserved.
  * Copyright (c) 2015      Mellanox Technologies, Inc.
  *                         All rights reserved.
- * Copyright (c) 2016-2019 Research Organization for Information Science
- *                         and Technology (RIST). All rights reserved.
+ * Copyright (c) 2016-2021 Research Organization for Information Science
+ *                         and Technology (RIST).  All rights reserved.
+ * Copyright (c) 2021      Triad National Security, LLC. All rights
+ *                         reserved.
+ * Copyright (c) 2021      Nanook Consulting.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -43,6 +47,8 @@
 #include "opal/util/show_help.h"
 #include "opal/runtime/opal.h"
 #include "opal/runtime/opal_params.h"
+#include "opal/mca/threads/threads.h"
+
 /*
  * Global variables
  *
@@ -62,7 +68,8 @@ bool ompi_mpi_keep_fqdn_hostnames = false;
 bool ompi_have_sparse_group_storage = OPAL_INT_TO_BOOL(OMPI_GROUP_SPARSE);
 bool ompi_use_sparse_group_storage = OPAL_INT_TO_BOOL(OMPI_GROUP_SPARSE);
 
-bool ompi_mpi_yield_when_idle = false;
+/* if the threads module requires yielding we use that as default but allow it to be overridden */
+bool ompi_mpi_yield_when_idle = OPAL_THREAD_YIELD_WHEN_IDLE_DEFAULT;
 int ompi_mpi_event_tick_rate = -1;
 char *ompi_mpi_show_mca_params_string = NULL;
 bool ompi_mpi_have_sparse_group_storage = !!(OMPI_GROUP_SPARSE);
@@ -84,11 +91,44 @@ static bool show_default_mca_params = false;
 static bool show_file_mca_params = false;
 static bool show_enviro_mca_params = false;
 static bool show_override_mca_params = false;
-static bool ompi_mpi_oversubscribe = false;
+bool ompi_mpi_oversubscribed = false;
+
+#if OPAL_ENABLE_FT_MPI
+int ompi_ftmpi_output_handle = 0;
+bool ompi_ftmpi_enabled = false;
+#include "ompi/communicator/communicator.h"
+#endif /* OPAL_ENABLE_FT_MPI */
 
 int ompi_mpi_register_params(void)
 {
     int value;
+
+#if OPAL_ENABLE_FT_MPI
+    mca_base_var_scope_t ftscope = MCA_BASE_VAR_SCOPE_READONLY;
+#else
+    mca_base_var_scope_t ftscope = MCA_BASE_VAR_SCOPE_CONSTANT;
+    bool ompi_ftmpi_enabled; /* not global in that case */
+#endif /* OPAL_ENABLE_FT_MPI */
+    ompi_ftmpi_enabled = false;
+    (void) mca_base_var_register ("ompi", "mpi", "ft", "enable",
+                                  "Enable UFLM MPI Fault Tolerance framework",
+                                  MCA_BASE_VAR_TYPE_BOOL, NULL, 0, 0,
+                                  OPAL_INFO_LVL_4, ftscope, &ompi_ftmpi_enabled);
+    value = 0;
+    (void) mca_base_var_register ("ompi", "mpi", "ft", "verbose",
+                                  "Verbosity level of the ULFM MPI Fault Tolerance framework",
+                                  MCA_BASE_VAR_TYPE_INT, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE,
+                                  OPAL_INFO_LVL_8, MCA_BASE_VAR_SCOPE_LOCAL, &value);
+#if OPAL_ENABLE_FT_MPI
+    if( 0 < value ) {
+        ompi_ftmpi_output_handle = opal_output_open(NULL);
+        opal_output_set_verbosity(ompi_ftmpi_output_handle, value);
+    }
+
+    (void) ompi_comm_rbcast_register_params();
+    (void) ompi_comm_failure_propagator_register_params();
+    (void) ompi_comm_failure_detector_register_params();
+#endif /* OPAL_ENABLE_FT_MPI */
 
     /* Whether we want MPI API function parameter checking or not. Disable this by default if
        parameter checking is compiled out. */
@@ -107,18 +147,7 @@ int ompi_mpi_register_params(void)
         ompi_mpi_param_check = false;
     }
 
-    /*
-     * opal_progress: decide whether to yield and the event library
-     * tick rate
-     */
-    ompi_mpi_oversubscribe = false;
-    (void) mca_base_var_register("ompi", "mpi", NULL, "oversubscribe",
-                                 "Internal MCA parameter set by the runtime environment when oversubscribing nodes",
-                                 MCA_BASE_VAR_TYPE_BOOL, NULL, 0, 0,
-                                 OPAL_INFO_LVL_9,
-                                 MCA_BASE_VAR_SCOPE_READONLY,
-                                 &ompi_mpi_oversubscribe);
-    ompi_mpi_yield_when_idle = ompi_mpi_oversubscribe;
+    /* yield if the node is oversubscribed and allow users to override */
     (void) mca_base_var_register("ompi", "mpi", NULL, "yield_when_idle",
                                  "Yield the processor when waiting for MPI communication (for MPI processes, will default to 1 when oversubscribing nodes)",
                                  MCA_BASE_VAR_TYPE_BOOL, NULL, 0, 0,
@@ -334,9 +363,10 @@ int ompi_mpi_register_params(void)
                                  MCA_BASE_VAR_SCOPE_READONLY,
                                  &ompi_mpi_compat_mpi3);
 
+#if SPC_ENABLE == 1
     ompi_mpi_spc_attach_string = NULL;
     (void) mca_base_var_register("ompi", "mpi", NULL, "spc_attach",
-                                 "A comma delimeted string listing the software-based performance counters (SPCs) to enable.",
+                                 "A comma-delimeted list of software-based performance counters (SPCs) to enable (\"all\" enables all counters).",
                                  MCA_BASE_VAR_TYPE_STRING, NULL, 0, 0,
                                  OPAL_INFO_LVL_4,
                                  MCA_BASE_VAR_SCOPE_READONLY,
@@ -344,11 +374,12 @@ int ompi_mpi_register_params(void)
 
     ompi_mpi_spc_dump_enabled = false;
     (void) mca_base_var_register("ompi", "mpi", NULL, "spc_dump_enabled",
-                                 "A boolean value for whether (true) or not (false) to enable dumping SPC counters in MPI_Finalize.",
+                                 "A boolean value for whether (true) or not (false) to enable dumping enabled SPC counters in MPI_Finalize.",
                                  MCA_BASE_VAR_TYPE_BOOL, NULL, 0, 0,
                                  OPAL_INFO_LVL_4,
                                  MCA_BASE_VAR_SCOPE_READONLY,
                                  &ompi_mpi_spc_dump_enabled);
+#endif // SPC_ENABLE
 
     return OMPI_SUCCESS;
 }

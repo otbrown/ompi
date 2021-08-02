@@ -13,6 +13,7 @@
  * Copyright (c) 2006-2017 University of Houston. All rights reserved.
  * Copyright (c) 2007-2018 Cisco Systems, Inc.  All rights reserved
  * Copyright (c) 2009      Sun Microsystems, Inc. All rights reserved.
+ * Copyright (c) 2010-2012 Oak Ridge National Labs.  All rights reserved.
  * Copyright (c) 2012-2015 Los Alamos National Security, LLC.
  *                         All rights reserved.
  * Copyright (c) 2011-2013 Inria.  All rights reserved.
@@ -394,6 +395,15 @@ static void ompi_comm_construct(ompi_communicator_t* comm)
     comm->c_peruse_handles = NULL;
 #endif
     OBJ_CONSTRUCT(&comm->c_lock, opal_mutex_t);
+
+#if OPAL_ENABLE_FT_MPI
+    comm->any_source_enabled  = true;
+    comm->any_source_offset   = 0;
+    comm->comm_revoked        = false;
+    comm->coll_revoked        = false;
+    comm->c_epoch             = 0;
+    comm->agreement_specific  = NULL;
+#endif
 }
 
 static void ompi_comm_destruct(ompi_communicator_t* comm)
@@ -456,6 +466,12 @@ static void ompi_comm_destruct(ompi_communicator_t* comm)
         comm->error_handler = NULL;
     }
 
+#if OPAL_ENABLE_FT_MPI
+    if( NULL != comm->agreement_specific ) {
+        OBJ_RELEASE( comm->agreement_specific );
+    }
+#endif  /* OPAL_ENABLE_FT_MPI */
+
     /* mark this cid as available */
     if ( MPI_UNDEFINED != (int)comm->c_contextid &&
          NULL != opal_pointer_array_get_item(&ompi_mpi_communicators,
@@ -476,7 +492,7 @@ static void ompi_comm_destruct(ompi_communicator_t* comm)
 }
 
 #define OMPI_COMM_SET_INFO_FN(name, flag)       \
-    static char *ompi_comm_set_ ## name (opal_infosubscriber_t *obj, char *key, char *value) \
+    static const char *ompi_comm_set_ ## name (opal_infosubscriber_t *obj, const char *key, const char *value) \
     {                                                                   \
         ompi_communicator_t *comm = (ompi_communicator_t *) obj;        \
                                                                         \

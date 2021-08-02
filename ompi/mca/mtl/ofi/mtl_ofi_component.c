@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2013-2018 Intel, Inc. All rights reserved
  *
- * Copyright (c) 2014-2017 Cisco Systems, Inc.  All rights reserved
+ * Copyright (c) 2014-2021 Cisco Systems, Inc.  All rights reserved
  * Copyright (c) 2015-2016 Los Alamos National Security, LLC.  All rights
  *                         reserved.
  * Copyright (c) 2018      Amazon.com, Inc. or its affiliates.  All Rights reserved.
@@ -15,10 +15,14 @@
  * $HEADER$
  */
 
+#include "opal_config.h"
 #include "mtl_ofi.h"
 #include "opal/util/argv.h"
 #include "opal/util/printf.h"
 #include "opal/mca/common/ofi/common_ofi.h"
+#if OPAL_CUDA_SUPPORT
+#include "opal/mca/common/cuda/common_cuda.h"
+#endif /* OPAL_CUDA_SUPPORT */
 
 static int ompi_mtl_ofi_component_open(void);
 static int ompi_mtl_ofi_component_query(mca_base_module_t **module, int *priority);
@@ -36,8 +40,8 @@ static int av_type;
 static int ofi_tag_mode;
 
 #if OPAL_HAVE_THREAD_LOCAL
-    opal_thread_local int per_thread_ctx;
-    opal_thread_local struct fi_cq_tagged_entry wc[MTL_OFI_MAX_PROG_EVENT_COUNT];
+    opal_thread_local int ompi_mtl_ofi_per_thread_ctx;
+    opal_thread_local struct fi_cq_tagged_entry ompi_mtl_ofi_wc[MTL_OFI_MAX_PROG_EVENT_COUNT];
 #endif
 
 /*
@@ -296,6 +300,9 @@ ompi_mtl_ofi_component_query(mca_base_module_t **module, int *priority)
 static int
 ompi_mtl_ofi_component_close(void)
 {
+#if OPAL_CUDA_SUPPORT
+    mca_common_cuda_fini();
+#endif
     opal_common_ofi_mca_deregister();
     return OMPI_SUCCESS;
 }
@@ -337,7 +344,7 @@ select_ofi_provider(struct fi_info *providers,
                         __FILE__, __LINE__,
                         (prov ? prov->fabric_attr->prov_name : "none"));
 
-     /* The initial fi_getinfo() call will return a list of providers
+    /** The initial provider selection will return a list of providers
       * available for this process. once a provider is selected from the
       * list, we will cycle through the remaining list to identify NICs
       * serviced by this provider, and try to pick one on the same NUMA
@@ -350,9 +357,13 @@ select_ofi_provider(struct fi_info *providers,
       * attributes for the same NIC. The initial provider attributes
       * are used to ensure that all NICs we return provide the same
       * capabilities as the inital one.
+      *
+      * We use package rank to select between NICs of equal distance
+      * if we cannot calculate a package_rank, we fall back to using the
+      * process id.
       */
     if (NULL != prov) {
-        prov = opal_mca_common_ofi_select_provider(prov, ompi_process_info.my_local_rank);
+        prov = opal_mca_common_ofi_select_provider(prov, &ompi_process_info);
         opal_output_verbose(1, ompi_mtl_base_framework.framework_output,
                             "%s:%d: mtl:ofi:provider: %s\n",
                             __FILE__, __LINE__,
@@ -362,46 +373,9 @@ select_ofi_provider(struct fi_info *providers,
     return prov;
 }
 
-
-/* Check if FI_REMOTE_CQ_DATA is supported, if so send the source rank there
- * FI_DIRECTED_RECV is also needed so receives can discrimate the source
- */
-static int
-ompi_mtl_ofi_check_fi_remote_cq_data(int fi_version,
-                                     struct fi_info *hints,
-                                     struct fi_info *provider,
-                                     struct fi_info **prov_cq_data)
-{
-    int ret;
-    char *provider_name;
-    struct fi_info *hints_dup;
-    hints_dup = fi_dupinfo(hints);
-
-    provider_name = strdup(provider->fabric_attr->prov_name);
-    hints_dup->fabric_attr->prov_name = provider_name;
-    hints_dup->caps |= FI_TAGGED | FI_DIRECTED_RECV;
-    /* Ask for the size that OMPI uses for the source rank number */
-    hints_dup->domain_attr->cq_data_size = sizeof(int);
-    ret = fi_getinfo(fi_version, NULL, NULL, 0ULL, hints_dup, prov_cq_data);
-
-    if ((0 != ret) && (-FI_ENODATA != ret)) {
-        opal_show_help("help-mtl-ofi.txt", "OFI call fail", true,
-                       "fi_getinfo",
-                       ompi_process_info.nodename, __FILE__, __LINE__,
-                       fi_strerror(-ret), -ret);
-        return ret;
-    } else if (-FI_ENODATA == ret) {
-        /* The provider does not support  FI_REMOTE_CQ_DATA */
-        prov_cq_data = NULL;
-    }
-
-    fi_freeinfo(hints_dup);
-    return OMPI_SUCCESS;
-}
-
 static void
-ompi_mtl_ofi_define_tag_mode(int ofi_tag_mode, int *bits_for_cid) {
-    switch (ofi_tag_mode) {
+ompi_mtl_ofi_define_tag_mode(int ofi_tag_mode_arg, int *bits_for_cid) {
+    switch (ofi_tag_mode_arg) {
         case MTL_OFI_TAG_1:
             *bits_for_cid = (int) MTL_OFI_CID_BIT_COUNT_1;
             ompi_mtl_ofi.base.mtl_max_tag = (int)((1ULL << (MTL_OFI_TAG_BIT_COUNT_1 - 1)) - 1);
@@ -624,6 +598,15 @@ ompi_mtl_ofi_component_init(bool enable_progress_threads,
     }
 
     /**
+     * Note: API version 1.5 is the first version that supports
+     * FI_LOCAL_COMM / FI_REMOTE_COMM checking (and we definitely need
+     * that checking -- e.g., the shared memory provider supports
+     * intranode communication (FI_LOCAL_COMM), but not internode
+     * (FI_REMOTE_COMM), which is insufficient for MTL selection.
+     */
+    fi_version = FI_VERSION(1, 5);
+
+    /**
      * Hints to filter providers
      * See man fi_getinfo for a list of all filters
      * mode:  Select capabilities MTL is prepared to support.
@@ -640,15 +623,27 @@ ompi_mtl_ofi_component_init(bool enable_progress_threads,
                             __FILE__, __LINE__);
         goto error;
     }
+
+#if OPAL_CUDA_SUPPORT
+    /** If Open MPI is built with CUDA, request device transfer
+     *  capabilities */
+    hints->caps |= FI_HMEM;
+    hints->domain_attr->mr_mode |= FI_MR_HMEM;
+    /**
+     * Note: API version 1.9 is the first version that supports FI_HMEM
+     */
+    fi_version = FI_VERSION(1, 9);
+#endif /* OPAL_CUDA_SUPPORT */
+
     /* Make sure to get a RDM provider that can do the tagged matching
        interface and local communication and remote communication. */
-    hints->mode               = FI_CONTEXT;
+    hints->mode               = FI_CONTEXT | FI_CONTEXT2;
     hints->ep_attr->type      = FI_EP_RDM;
-    hints->caps               = FI_TAGGED | FI_LOCAL_COMM | FI_REMOTE_COMM;
+    hints->caps               |= FI_TAGGED | FI_LOCAL_COMM | FI_REMOTE_COMM | FI_DIRECTED_RECV;
     hints->tx_attr->msg_order = FI_ORDER_SAS;
     hints->rx_attr->msg_order = FI_ORDER_SAS;
-    hints->rx_attr->op_flags = FI_COMPLETION;
-    hints->tx_attr->op_flags = FI_COMPLETION;
+    hints->rx_attr->op_flags  = FI_COMPLETION;
+    hints->tx_attr->op_flags  = FI_COMPLETION;
 
     if (enable_mpi_threads) {
         ompi_mtl_ofi.mpi_thread_multiple = true;
@@ -656,6 +651,10 @@ ompi_mtl_ofi_component_init(bool enable_progress_threads,
     } else {
         ompi_mtl_ofi.mpi_thread_multiple = false;
         hints->domain_attr->threading = FI_THREAD_DOMAIN;
+    }
+
+    if ((MTL_OFI_TAG_AUTO == ofi_tag_mode) || (MTL_OFI_TAG_FULL == ofi_tag_mode)) {
+        hints->domain_attr->cq_data_size = sizeof(int);
     }
 
     switch (control_progress) {
@@ -687,18 +686,6 @@ ompi_mtl_ofi_component_init(bool enable_progress_threads,
     }
 
     hints->domain_attr->resource_mgmt    = FI_RM_ENABLED;
-
-    /**
-     * FI_VERSION provides binary backward and forward compatibility support
-     * Specify the version of OFI is coded to, the provider will select struct
-     * layouts that are compatible with this version.
-     *
-     * Note: API version 1.5 is the first version that supports
-     * FI_LOCAL_COMM / FI_REMOTE_COMM checking (and we definitely need
-     * that checking -- e.g., some providers are suitable for RXD or
-     * RXM, but can't provide local communication).
-     */
-    fi_version = FI_VERSION(1, 5);
 
     /**
      * The EFA provider in Libfabric versions prior to 1.10 contains a bug
@@ -790,19 +777,27 @@ select_prov:
     opal_argv_free(exclude_list);
     exclude_list = NULL;
 
+#if OPAL_CUDA_SUPPORT
+    if (!(prov->caps & FI_HMEM)) {
+        opal_output_verbose(1, opal_common_ofi.output,
+                            "%s:%d: Libfabric provider does not support CUDA buffers\n",
+                            __FILE__, __LINE__);
+        goto error;
+    }
+#endif /* OPAL_CUDA_SUPPORT */
+
     /**
      * Select the format of the OFI tag
      */
     if ((MTL_OFI_TAG_AUTO == ofi_tag_mode) ||
         (MTL_OFI_TAG_FULL == ofi_tag_mode)) {
-            ret = ompi_mtl_ofi_check_fi_remote_cq_data(fi_version,
-                                                       hints, prov,
-                                                       &prov_cq_data);
-            if (OMPI_SUCCESS != ret) {
-                goto error;
-            } else if (NULL == prov_cq_data) {
+            if (prov->domain_attr->cq_data_size >= sizeof(int) &&
+                (prov->caps & FI_DIRECTED_RECV)) {
+                /* Use FI_REMOTE_CQ_DATA */
+                ompi_mtl_ofi.fi_cq_data = true;
+                ompi_mtl_ofi_define_tag_mode(MTL_OFI_TAG_FULL, &ofi_tag_bits_for_cid);
+            } else {
                 /* No support for FI_REMTOTE_CQ_DATA */
-                fi_freeinfo(prov_cq_data);
                 ompi_mtl_ofi.fi_cq_data = false;
                 if (MTL_OFI_TAG_AUTO == ofi_tag_mode) {
                    /* Fallback to MTL_OFI_TAG_1 */
@@ -813,11 +808,6 @@ select_prov:
                             __FILE__, __LINE__, prov->fabric_attr->prov_name);
                     goto error;
                 }
-            } else {
-                /* Use FI_REMTOTE_CQ_DATA */
-                ompi_mtl_ofi.fi_cq_data = true;
-                prov = prov_cq_data;
-                ompi_mtl_ofi_define_tag_mode(MTL_OFI_TAG_FULL, &ofi_tag_bits_for_cid);
             }
     } else { /* MTL_OFI_TAG_1 or MTL_OFI_TAG_2 */
         ompi_mtl_ofi.fi_cq_data = false;
@@ -1071,6 +1061,10 @@ select_prov:
      */
     ompi_mtl_ofi.any_addr = FI_ADDR_UNSPEC;
 
+#if OPAL_CUDA_SUPPORT
+    mca_common_cuda_stage_one_init();
+#endif
+
     return &ompi_mtl_ofi.base;
 
 error:
@@ -1170,6 +1164,3 @@ finalize_err:
 
     return OMPI_ERROR;
 }
-
-
-

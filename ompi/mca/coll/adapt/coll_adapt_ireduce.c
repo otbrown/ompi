@@ -2,6 +2,7 @@
  * Copyright (c) 2014-2020 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
+ * Copyright (c) 2020      Cisco Systems, Inc.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -524,7 +525,6 @@ int ompi_coll_adapt_ireduce_generic(const void *sbuf, void *rbuf, int count,
     char **accumbuf = NULL;
     opal_mutex_t *mutex_op_list;
     /* A list to store the segments need to be sent */
-    opal_list_t *recv_list;
     mca_pml_base_send_mode_t sendmode = (mca_coll_adapt_component.adapt_ireduce_synchronous_send)
                                         ? MCA_PML_BASE_SEND_SYNCHRONOUS : MCA_PML_BASE_SEND_STANDARD;
 
@@ -604,7 +604,7 @@ int ompi_coll_adapt_ireduce_generic(const void *sbuf, void *rbuf, int count,
     /* If the current process is not leaf */
     if (tree->tree_nextsize > 0) {
         size_t num_allocate_elems = mca_coll_adapt_component.adapt_inbuf_free_list_min;
-        if (tree->tree_nextsize * num_segs < num_allocate_elems) {
+        if (((size_t) tree->tree_nextsize * num_segs) < num_allocate_elems) {
             num_allocate_elems = tree->tree_nextsize * num_segs;
         }
         opal_free_list_init(&con->inbuf_list,
@@ -624,7 +624,7 @@ int ompi_coll_adapt_ireduce_generic(const void *sbuf, void *rbuf, int count,
         OPAL_OUTPUT_VERBOSE((30, mca_coll_adapt_component.adapt_output,
                              "[%d]: distance %d, inbuf %p, inbuf->buff %p, inbuf->buff-lb %p, to_inbuf %p, inbuf_list %p\n",
                              rank, con->distance, (void *) temp_inbuf, (void *) temp_inbuf->buff,
-                             (char *) temp_inbuf->buff - lower_bound,
+                             (void *) ((char *) temp_inbuf->buff - lower_bound),
                              (void *) to_inbuf((char *) temp_inbuf->buff - lower_bound, con->distance),
                              (void *) &con->inbuf_list));
         opal_free_list_return_st(&con->inbuf_list, (opal_free_list_item_t *) temp_inbuf);

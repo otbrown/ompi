@@ -235,6 +235,11 @@ int mca_common_ompio_file_close (ompio_file_t *ompio_fh)
     int delete_flag = 0;
     char name[256];
 
+    /* Call coll_barrier only if collectives are set (same reasoning as below for f_fs) */
+    if (NULL == ompio_fh->f_comm || NULL == ompio_fh->f_comm->c_coll) {
+        return OMPI_SUCCESS;
+    }
+
     ret = ompio_fh->f_comm->c_coll->coll_barrier ( ompio_fh->f_comm, ompio_fh->f_comm->c_coll->coll_barrier_module);
     if ( OMPI_SUCCESS != ret ) {
         /* Not sure what to do */
@@ -415,7 +420,7 @@ int mca_common_ompio_set_file_defaults (ompio_file_t *fh)
 {
 
    if (NULL != fh) {
-       char char_stripe[MPI_MAX_INFO_VAL];
+       opal_cstring_t *stripe_str;
        ompi_datatype_t *types[2];
        int blocklen[2] = {1, 1};
        ptrdiff_t d[2], base;
@@ -426,11 +431,12 @@ int mca_common_ompio_set_file_defaults (ompio_file_t *fh)
        fh->f_flags = 0;
        
        fh->f_bytes_per_agg = OMPIO_MCA_GET(fh, bytes_per_agg);
-       opal_info_get (fh->f_info, "cb_buffer_size", MPI_MAX_INFO_VAL, char_stripe, &flag);
+       opal_info_get (fh->f_info, "cb_buffer_size", &stripe_str, &flag);
        if ( flag ) {
            /* Info object trumps mca parameter value */
-           sscanf ( char_stripe, "%d", &fh->f_bytes_per_agg  );
-           OMPIO_MCA_PRINT_INFO(fh, "cb_buffer_size", char_stripe, "");
+           sscanf ( stripe_str->string, "%d", &fh->f_bytes_per_agg  );
+           OMPIO_MCA_PRINT_INFO(fh, "cb_buffer_size", stripe_str->string, "");
+           OBJ_RELEASE(stripe_str);
        }
 
        fh->f_atomicity = 0;

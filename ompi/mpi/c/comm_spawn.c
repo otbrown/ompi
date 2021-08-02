@@ -12,6 +12,7 @@
  *                         All rights reserved.
  * Copyright (c) 2006-2015 Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2009      Sun Microsystems, Inc.  All rights reserved.
+ * Copyright (c) 2010-2012 Oak Ridge National Labs.  All rights reserved.
  * Copyright (c) 2013      Los Alamos National Security, LLC.  All rights
  *                         reserved.
  * Copyright (c) 2015      Intel, Inc. All rights reserved.
@@ -27,6 +28,7 @@
 #include <stdio.h>
 
 #include "opal/util/show_help.h"
+#include "opal/util/printf.h"
 
 #include "ompi/info/info.h"
 #include "ompi/mpi/c/bindings.h"
@@ -53,8 +55,8 @@ int MPI_Comm_spawn(const char *command, char *argv[], int maxprocs, MPI_Info inf
 {
     int rank, rc=OMPI_SUCCESS, i, flag;
     bool send_first = false; /* we wait to be contacted */
-    ompi_communicator_t *newcomp=NULL;
-    char port_name[MPI_MAX_PORT_NAME];
+    ompi_communicator_t *newcomp=MPI_COMM_NULL;
+    char port_name[MPI_MAX_PORT_NAME]; char *port_string = NULL;
     bool non_mpi = false;
 
     MEMCHECKER(
@@ -81,6 +83,12 @@ int MPI_Comm_spawn(const char *command, char *argv[], int maxprocs, MPI_Info inf
                                           FUNC_NAME);
         }
     }
+
+#if OPAL_ENABLE_FT_MPI
+    if( OPAL_UNLIKELY(!ompi_comm_iface_coll_check(comm, &rc)) ) {
+        return OMPI_ERRHANDLER_INVOKE(comm, rc, FUNC_NAME);
+    }
+#endif
 
     rank = ompi_comm_rank ( comm );
     if ( MPI_PARAM_CHECK ) {
@@ -112,8 +120,6 @@ int MPI_Comm_spawn(const char *command, char *argv[], int maxprocs, MPI_Info inf
         ompi_info_get_bool(info, "ompi_non_mpi", &non_mpi, &flag);
     }
 
-    OPAL_CR_ENTER_LIBRARY();
-
     if ( rank == root ) {
         if (!non_mpi) {
             /* Open a port. The port_name is passed as an environment
@@ -132,13 +138,25 @@ int MPI_Comm_spawn(const char *command, char *argv[], int maxprocs, MPI_Info inf
         }
     }
 
+error:
+    if (OMPI_SUCCESS != rc) {
+        /* There was an error in one of the above stages,
+         * we still need to do the connect_accept stage so that
+         * non-root ranks do not deadlock.
+         * Add the error code to the port string for connect_accept
+         * to propagate the error code. */
+        (void)opal_asprintf(&port_string, "%s:error=%d", port_name, rc);
+    }
+    else {
+        port_string = port_name;
+    }
+
     if (non_mpi) {
         newcomp = MPI_COMM_NULL;
     } else {
-        rc = ompi_dpm_connect_accept (comm, root, port_name, send_first, &newcomp);
+        rc = ompi_dpm_connect_accept (comm, root, port_string, send_first, &newcomp);
     }
 
-error:
     if (OPAL_ERR_NOT_SUPPORTED == rc) {
         opal_show_help("help-mpi-api.txt",
                        "MPI function not supported",
@@ -147,12 +165,14 @@ error:
                        "Underlying runtime environment does not support spawn functionality");
     }
 
+    if(port_string != port_name) {
+        free(port_string);
+    }
+
     /* close the port */
     if (rank == root && !non_mpi) {
         ompi_dpm_close_port(port_name);
     }
-
-    OPAL_CR_EXIT_LIBRARY();
 
     /* set error codes */
     if (MPI_ERRCODES_IGNORE != array_of_errcodes) {

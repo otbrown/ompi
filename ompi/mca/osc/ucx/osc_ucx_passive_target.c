@@ -42,7 +42,7 @@ static inline int start_shared(ompi_osc_ucx_module_t *module, int target) {
         } else {
             break;
         }
-        ucp_worker_progress(mca_osc_ucx_component.wpool->dflt_worker);
+        opal_common_ucx_wpool_progress(mca_osc_ucx_component.wpool);
     }
 
     return ret;
@@ -70,8 +70,7 @@ static inline int start_exclusive(ompi_osc_ucx_module_t *module, int target) {
         if (result_value == TARGET_LOCK_UNLOCKED) {
             return OMPI_SUCCESS;
         }
-
-        ucp_worker_progress(mca_osc_ucx_component.wpool->dflt_worker);
+        opal_common_ucx_wpool_progress(mca_osc_ucx_component.wpool);
     }
 }
 
@@ -82,7 +81,7 @@ static inline int end_exclusive(ompi_osc_ucx_module_t *module, int target) {
                                       sizeof(uint64_t), remote_addr);
 }
 
-int ompi_osc_ucx_lock(int lock_type, int target, int assert, struct ompi_win_t *win) {
+int ompi_osc_ucx_lock(int lock_type, int target, int mpi_assert, struct ompi_win_t *win) {
     ompi_osc_ucx_module_t *module = (ompi_osc_ucx_module_t *)win->w_osc_module;
     ompi_osc_ucx_lock_t *lock = NULL;
     ompi_osc_ucx_epoch_t original_epoch = module->epoch_type.access;
@@ -114,7 +113,7 @@ int ompi_osc_ucx_lock(int lock_type, int target, int assert, struct ompi_win_t *
     lock = OBJ_NEW(ompi_osc_ucx_lock_t);
     lock->target_rank = target;
 
-    if ((assert & MPI_MODE_NOCHECK) == 0) {
+    if ((mpi_assert & MPI_MODE_NOCHECK) == 0) {
         lock->is_nocheck = false;
         if (lock_type == MPI_LOCK_EXCLUSIVE) {
             ret = start_exclusive(module, target);
@@ -178,7 +177,7 @@ int ompi_osc_ucx_unlock(int target, struct ompi_win_t *win) {
     return ret;
 }
 
-int ompi_osc_ucx_lock_all(int assert, struct ompi_win_t *win) {
+int ompi_osc_ucx_lock_all(int mpi_assert, struct ompi_win_t *win) {
     ompi_osc_ucx_module_t *module = (ompi_osc_ucx_module_t*) win->w_osc_module;
     int ret = OMPI_SUCCESS;
 
@@ -194,7 +193,7 @@ int ompi_osc_ucx_lock_all(int assert, struct ompi_win_t *win) {
 
     module->epoch_type.access = PASSIVE_ALL_EPOCH;
 
-    if (0 == (assert & MPI_MODE_NOCHECK)) {
+    if (0 == (mpi_assert & MPI_MODE_NOCHECK)) {
         int i, comm_size;
         module->lock_all_is_nocheck = false;
         comm_size = ompi_comm_size(module->comm);

@@ -101,6 +101,13 @@ extern int mca_pml_ob1_del_comm(
     struct ompi_communicator_t* comm
 );
 
+#if OPAL_ENABLE_FT_MPI
+extern int mca_pml_ob1_revoke_comm(
+    struct ompi_communicator_t* comm,
+    bool coll_only
+);
+#endif
+
 extern int mca_pml_ob1_add_procs(
     struct ompi_proc_t **procs,
     size_t nprocs
@@ -206,8 +213,6 @@ extern int mca_pml_ob1_dump( struct ompi_communicator_t* comm,
 
 extern int mca_pml_ob1_start( size_t count,
                               ompi_request_t** requests );
-
-extern int mca_pml_ob1_ft_event( int state );
 
 /**
  * We will use these requests to hold on a traditionally allocated

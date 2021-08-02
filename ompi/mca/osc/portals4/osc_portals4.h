@@ -16,11 +16,14 @@
 #ifndef OSC_PORTALS4_PORTALS4_H
 #define OSC_PORTALS4_PORTALS4_H
 
-#include <portals4.h>
-#include "ompi/group/group.h"
+#include "ompi_config.h"
+
 #include "ompi/communicator/communicator.h"
+#include "ompi/group/group.h"
 
 #include "ompi/mca/mtl/portals4/mtl_portals4.h"
+
+#include <portals4.h>
 
 #define REQ_OSC_TABLE_ID     4
 
@@ -242,16 +245,16 @@ int ompi_osc_portals4_rget_accumulate(const void *origin_addr,
                                       struct ompi_win_t *win,
                                       struct ompi_request_t **request);
 
-int ompi_osc_portals4_fence(int assert, struct ompi_win_t *win);
+int ompi_osc_portals4_fence(int mpi_assert, struct ompi_win_t *win);
 
 int ompi_osc_portals4_start(struct ompi_group_t *group,
-                            int assert,
+                            int mpi_assert,
                             struct ompi_win_t *win);
 
 int ompi_osc_portals4_complete(struct ompi_win_t *win);
 
 int ompi_osc_portals4_post(struct ompi_group_t *group,
-                           int assert,
+                           int mpi_assert,
                            struct ompi_win_t *win);
 
 int ompi_osc_portals4_wait(struct ompi_win_t *win);
@@ -261,14 +264,14 @@ int ompi_osc_portals4_test(struct ompi_win_t *win,
 
 int ompi_osc_portals4_lock(int lock_type,
                            int target,
-                           int assert,
+                           int mpi_assert,
                            struct ompi_win_t *win);
 
 int ompi_osc_portals4_unlock(int target,
                              struct ompi_win_t *win);
 
 
-int ompi_osc_portals4_lock_all(int assert,
+int ompi_osc_portals4_lock_all(int mpi_assert,
                                struct ompi_win_t *win);
 
 int ompi_osc_portals4_unlock_all(struct ompi_win_t *win);

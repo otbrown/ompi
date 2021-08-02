@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2005 The Trustees of Indiana University and Indiana
  *                         University Research and Technology
  *                         Corporation.  All rights reserved.
- * Copyright (c) 2004-2020 The University of Tennessee and The University
+ * Copyright (c) 2004-2021 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2004-2005 High Performance Computing Center Stuttgart,
@@ -71,7 +71,6 @@ typedef void (ompi_errhandler_generic_handler_fn_t)(void *, int *, ...);
  */
 enum ompi_errhandler_lang_t {
     OMPI_ERRHANDLER_LANG_C,
-    OMPI_ERRHANDLER_LANG_CXX,
     OMPI_ERRHANDLER_LANG_FORTRAN
 };
 typedef enum ompi_errhandler_lang_t ompi_errhandler_lang_t;
@@ -88,17 +87,6 @@ enum ompi_errhandler_type_t {
 };
 typedef enum ompi_errhandler_type_t ompi_errhandler_type_t;
 
-
-/*
- * Need to forward declare this for use in ompi_errhandle_cxx_dispatch_fn_t.
- */
-struct ompi_errhandler_t;
-
-/**
- * C++ invocation function signature
- */
-typedef void (ompi_errhandler_cxx_dispatch_fn_t)(void *handle, int *err_code,
-                                                 const char *message, ompi_errhandler_generic_handler_fn_t *fn);
 
 /**
  * Back-end type for MPI_Errorhandler.
@@ -122,14 +110,6 @@ struct ompi_errhandler_t {
     ompi_file_errhandler_function *eh_file_fn;
     MPI_Win_errhandler_function *eh_win_fn;
     ompi_errhandler_fortran_handler_fn_t *eh_fort_fn;
-
-    /* Have separate callback for C++ errhandlers.  This pointer is
-       initialized to NULL and will be set explicitly by the C++
-       bindings for Create_errhandler.  This function is invoked
-       when eh_lang==OMPI_ERRHANDLER_LANG_CXX so that the user's
-       callback function can be invoked with the right language
-       semantics. */
-    ompi_errhandler_cxx_dispatch_fn_t *eh_cxx_dispatch_fn;
 
     /* index in Fortran <-> C translation array */
     int eh_f_to_c_index;
@@ -281,7 +261,6 @@ struct ompi_request_t;
 #define OMPI_ERRHANDLER_CHECK(rc, mpi_object, err_code, message) \
   if( OPAL_UNLIKELY(rc != OMPI_SUCCESS) ) { \
     int __mpi_err_code = ompi_errcode_get_mpi_code(err_code);         \
-    OPAL_CR_EXIT_LIBRARY() \
     ompi_errhandler_invoke((mpi_object)->error_handler, \
                            (mpi_object), \
                            (int) (mpi_object)->errhandler_type, \
@@ -294,7 +273,6 @@ struct ompi_request_t;
 #define OMPI_ERRHANDLER_NOHANDLE_CHECK(rc, err_code, message) \
   if( OPAL_UNLIKELY(rc != OMPI_SUCCESS) ) { \
     int __mpi_err_code = ompi_errcode_get_mpi_code(err_code);         \
-    OPAL_CR_EXIT_LIBRARY() \
     ompi_errhandler_invoke(NULL, \
                            NULL, \
                            -1, \
@@ -319,7 +297,6 @@ struct ompi_request_t;
  * MPI_SUCCESS.
  */
 #define OMPI_ERRHANDLER_RETURN(rc, mpi_object, err_code, message) \
-  OPAL_CR_EXIT_LIBRARY() \
   if ( OPAL_UNLIKELY(OMPI_SUCCESS != rc) ) { \
     int __mpi_err_code = ompi_errcode_get_mpi_code(err_code);         \
     ompi_errhandler_invoke((mpi_object)->error_handler, \
@@ -335,7 +312,6 @@ struct ompi_request_t;
 /* Same as OMPI_ERRHANDLER_RETURN for non-handle attached errors */
 #define OMPI_ERRHANDLER_NOHANDLE_RETURN(rc, err_code, message) {\
   OMPI_ERRHANDLER_NOHANDLE_CHECK(rc, err_code, message) \
-  OPAL_CR_EXIT_LIBRARY() \
   return MPI_SUCCESS; \
 }
 
@@ -472,6 +448,15 @@ static inline bool ompi_errhandler_is_intrinsic(ompi_errhandler_t *errhandler)
 
     return false;
 }
+
+#if OPAL_ENABLE_FT_MPI
+struct ompi_proc_t;
+
+OMPI_DECLSPEC int ompi_errhandler_proc_failed_internal(struct ompi_proc_t *ompi_proc, int status, bool forward);
+static inline int ompi_errhandler_proc_failed(struct ompi_proc_t* ompi_proc) {
+    return ompi_errhandler_proc_failed_internal(ompi_proc, OPAL_ERR_PROC_ABORTED, true);
+}
+#endif /* OPAL_ENABLE_FT_MPI */
 
 END_C_DECLS
 

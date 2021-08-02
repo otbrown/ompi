@@ -61,18 +61,18 @@ dnl
 AC_DEFUN([_OPAL_CHECK_OFI],[
     # Add --with options
     AC_ARG_WITH([libfabric],
-                [AC_HELP_STRING([--with-libfabric=DIR],
+                [AS_HELP_STRING([--with-libfabric=DIR],
                                 [Deprecated synonym for --with-ofi])])
     AC_ARG_WITH([libfabric-libdir],
-                [AC_HELP_STRING([--with-libfabric-libdir=DIR],
+                [AS_HELP_STRING([--with-libfabric-libdir=DIR],
                                 [Deprecated synonym for --with-ofi-libdir])])
 
     AC_ARG_WITH([ofi],
-                [AC_HELP_STRING([--with-ofi=DIR],
+                [AS_HELP_STRING([--with-ofi=DIR],
                                 [Specify location of OFI libfabric installation, adding DIR/include to the default search location for libfabric headers, and DIR/lib or DIR/lib64 to the default search location for libfabric libraries.  Error if libfabric support cannot be found.])])
 
     AC_ARG_WITH([ofi-libdir],
-                [AC_HELP_STRING([--with-ofi-libdir=DIR],
+                [AS_HELP_STRING([--with-ofi-libdir=DIR],
                                 [Search for OFI libfabric libraries in DIR])])
 
     if test "$with_ofi" = ""; then
@@ -121,15 +121,22 @@ AC_DEFUN([_OPAL_CHECK_OFI],[
                               [],
                               [opal_ofi_happy=no])])
 
+    CPPFLAGS="$CPPFLAGS $opal_ofi_CPPFLAGS"
+
     AS_IF([test $opal_ofi_happy = yes],
           [AC_CHECK_MEMBER([struct fi_info.nic],
                            [opal_check_fi_info_pci=1],
                            [opal_check_fi_info_pci=0],
-                           [[#include "$with_ofi/include/rdma/fabric.h"]])])
+                           [[#include <rdma/fabric.h>]])])
 
     AC_DEFINE_UNQUOTED([OPAL_OFI_PCI_DATA_AVAILABLE],
                        [$opal_check_fi_info_pci],
                        [check if pci data is available in ofi])
+
+    AC_CHECK_DECLS([PMIX_PACKAGE_RANK],
+                   [],
+                   [],
+                   [#include <pmix.h>])
 
     CPPFLAGS=$opal_check_ofi_save_CPPFLAGS
     LDFLAGS=$opal_check_ofi_save_LDFLAGS

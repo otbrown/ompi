@@ -12,21 +12,21 @@
  */
 
 #include "ompi_config.h"
+
+#include "opal/util/bit_ops.h"
+
+#include "ompi/constants.h"
+#include "ompi/datatype/ompi_datatype.h"
+#include "ompi/datatype/ompi_datatype_internal.h"
+#include "ompi/mca/coll/base/base.h"
+#include "ompi/mca/coll/coll.h"
+#include "ompi/mca/pml/pml.h"
+#include "ompi/op/op.h"
+
 #include "coll_portals4.h"
 #include "coll_portals4_request.h"
 
 #include <stdio.h>
-
-#include "mpi.h"
-#include "ompi/constants.h"
-#include "ompi/datatype/ompi_datatype.h"
-#include "ompi/datatype/ompi_datatype_internal.h"
-#include "ompi/op/op.h"
-#include "opal/util/bit_ops.h"
-#include "ompi/mca/pml/pml.h"
-#include "ompi/mca/coll/coll.h"
-#include "ompi/mca/coll/base/base.h"
-
 
 #define COLL_PORTALS4_ALLREDUCE_MAX_SEGMENT	128
 #define COLL_PORTALS4_ALLREDUCE_MAX_CHILDREN	2
@@ -383,7 +383,7 @@ allreduce_kary_tree_bottom(ompi_coll_portals4_request_t *request)
 int ompi_coll_portals4_allreduce_intra(const void* sendbuf, void* recvbuf, int count,
         MPI_Datatype dtype, MPI_Op op,
         struct ompi_communicator_t *comm,
-        struct mca_coll_base_module_2_3_0_t *module)
+        mca_coll_base_module_t *module)
 {
     mca_coll_portals4_module_t *portals4_module = (mca_coll_portals4_module_t*) module;
     ompi_coll_portals4_request_t *request;
@@ -413,7 +413,7 @@ int ompi_coll_portals4_iallreduce_intra(const void* sendbuf, void* recvbuf, int 
         MPI_Datatype dtype, MPI_Op op,
         struct ompi_communicator_t *comm,
         ompi_request_t ** ompi_request,
-        struct mca_coll_base_module_2_3_0_t *module)
+        mca_coll_base_module_t *module)
 {
     mca_coll_portals4_module_t *portals4_module = (mca_coll_portals4_module_t*) module;
     ompi_coll_portals4_request_t *request;

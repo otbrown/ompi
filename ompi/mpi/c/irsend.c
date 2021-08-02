@@ -11,6 +11,7 @@
  * Copyright (c) 2004-2005 The Regents of the University of California.
  *                         All rights reserved.
  * Copyright (c) 2006      Cisco Systems, Inc.  All rights reserved.
+ * Copyright (c) 2010-2012 Oak Ridge National Labs.  All rights reserved.
  * Copyright (c) 2013      Los Alamos National Security, LLC.  All rights
  *                         reserved.
  * Copyright (c) 2015      Research Organization for Information Science
@@ -82,7 +83,12 @@ int MPI_Irsend(const void *buf, int count, MPI_Datatype type, int dest,
         return MPI_SUCCESS;
     }
 
-    OPAL_CR_ENTER_LIBRARY();
+#if OPAL_ENABLE_FT_MPI
+    /*
+     * The request will be checked for process failure errors during the
+     * completion calls. So no need to check here.
+     */
+#endif
 
     MEMCHECKER (
         memchecker_call(&opal_memchecker_base_mem_noaccess, buf, count, type);

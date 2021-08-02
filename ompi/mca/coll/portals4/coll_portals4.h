@@ -19,22 +19,22 @@
 
 #include "ompi_config.h"
 
-#include <portals4.h>
-#include "mpi.h"
+#include "opal/datatype/opal_convertor.h"
+
+#include "ompi/communicator/communicator.h"
 #include "ompi/constants.h"
 #include "ompi/datatype/ompi_datatype.h"
 #include "ompi/datatype/ompi_datatype_internal.h"
-#include "ompi/op/op.h"
 #include "ompi/mca/mca.h"
-#include "opal/datatype/opal_convertor.h"
-#include "ompi/mca/coll/coll.h"
-#include "ompi/request/request.h"
-#include "ompi/communicator/communicator.h"
 #include "ompi/mca/coll/base/base.h"
-#include "ompi/datatype/ompi_datatype.h"
-#include "ompi/mca/mtl/portals4/mtl_portals4_endpoint.h"
+#include "ompi/mca/coll/coll.h"
+#include "ompi/op/op.h"
+#include "ompi/request/request.h"
 
 #include "ompi/mca/mtl/portals4/mtl_portals4.h"
+#include "ompi/mca/mtl/portals4/mtl_portals4_endpoint.h"
+
+#include <portals4.h>
 
 #define MAXTREEFANOUT 32
 
@@ -207,18 +207,18 @@ int ompi_coll_portals4_ireduce_intra(const void* sendbuf, void* recvbuf, int cou
         int root,
         struct ompi_communicator_t *comm,
         ompi_request_t ** ompi_request,
-        struct mca_coll_base_module_2_3_0_t *module);
+        mca_coll_base_module_t *module);
 int ompi_coll_portals4_ireduce_intra_fini(struct ompi_coll_portals4_request_t *request);
 
 int ompi_coll_portals4_allreduce_intra(const void* sendbuf, void* recvbuf, int count,
         MPI_Datatype dtype, MPI_Op op,
         struct ompi_communicator_t *comm,
-        struct mca_coll_base_module_2_3_0_t *module);
+        mca_coll_base_module_t *module);
 int ompi_coll_portals4_iallreduce_intra(const void* sendbuf, void* recvbuf, int count,
         MPI_Datatype dtype, MPI_Op op,
         struct ompi_communicator_t *comm,
         ompi_request_t ** ompi_request,
-        struct mca_coll_base_module_2_3_0_t *module);
+        mca_coll_base_module_t *module);
 int
 ompi_coll_portals4_iallreduce_intra_fini(struct ompi_coll_portals4_request_t *request);
 

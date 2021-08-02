@@ -6,7 +6,7 @@
  * Copyright (c) 2004-2005 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
- * Copyright (c) 2004-2005 High Performance Computing Center Stuttgart,
+ * Copyright (c) 2004-2020 High Performance Computing Center Stuttgart,
  *                         University of Stuttgart.  All rights reserved.
  * Copyright (c) 2004-2005 The Regents of the University of California.
  *                         All rights reserved.
@@ -26,15 +26,24 @@
 #ifndef OPAL_MCA_THREADS_QTHREADS_THREADS_QTHREADS_THREADS_H
 #define OPAL_MCA_THREADS_QTHREADS_THREADS_QTHREADS_THREADS_H 1
 
-#include <qthread/qthread.h>
+#include "opal/mca/threads/qthreads/threads_qthreads.h"
 #include <signal.h>
 
 struct opal_thread_t {
     opal_object_t super;
     opal_thread_fn_t t_run;
     void *t_arg;
-    unsigned *t_handle;
     void *t_ret;
+    aligned_t t_thread_ret;
+    aligned_t *t_thread_ret_ptr;
 };
+
+/* Qthreads are cooperatively scheduled so yield when idle */
+#define OPAL_THREAD_YIELD_WHEN_IDLE_DEFAULT true
+
+static inline void opal_thread_yield(void)
+{
+    qthread_yield();
+}
 
 #endif /* OPAL_MCA_THREADS_QTHREADS_THREADS_QTHREADS_THREADS_H */

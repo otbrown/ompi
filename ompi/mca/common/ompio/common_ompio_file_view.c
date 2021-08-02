@@ -9,7 +9,7 @@
  *                         University of Stuttgart.  All rights reserved.
  * Copyright (c) 2004-2005 The Regents of the University of California.
  *                         All rights reserved.
- * Copyright (c) 2008-2019 University of Houston. All rights reserved.
+ * Copyright (c) 2008-2021 University of Houston. All rights reserved.
  * Copyright (c) 2017-2018 Research Organization for Information Science
  *                         and Technology (RIST). All rights reserved.
  * Copyright (c) 2017      IBM Corporation. All rights reserved.
@@ -72,6 +72,16 @@ int mca_common_ompio_set_view (ompio_file_t *fh,
     ptrdiff_t ftype_extent, lb, ub;
     ompi_datatype_t *newfiletype;
 
+    if ( (MPI_DISPLACEMENT_CURRENT == disp) &&
+         (fh->f_amode & MPI_MODE_SEQUENTIAL) ) {
+        mca_sharedfp_base_module_t * shared_fp_base_module = fh->f_sharedfp;
+        if ( NULL == shared_fp_base_module ){
+            opal_output(0, "No shared file pointer component found for this file. Can not execute\n");
+            return OMPI_ERROR;
+        }
+        shared_fp_base_module->sharedfp_get_position(fh, &disp);
+    }
+    
     if ( NULL != fh->f_etype ) {
         ompi_datatype_destroy (&fh->f_etype);
     }
@@ -167,7 +177,17 @@ int mca_common_ompio_set_view (ompio_file_t *fh,
         // File view is not a multiple of the etype.
         return MPI_ERR_ARG;
     }
+    
+    // make sure that displacement is not negative, which could
+    // lead to an illegal access.
+    if ( 0 < fh->f_iov_count && 0 > (off_t)fh->f_decoded_iov[0].iov_base ) {
+        // I think MPI_ERR_TYPE would be more appropriate, but
+        // this is the error code expected in a testsuite, so I just
+        // go with this.
+        return MPI_ERR_IO;
+    }
 
+    
     if( SIMPLE_PLUS == OMPIO_MCA_GET(fh, grouping_option) ) {
         fh->f_cc_size = get_contiguous_chunk_size (fh, 1);
     }
@@ -200,19 +220,21 @@ int mca_common_ompio_set_view (ompio_file_t *fh,
        }
     }
 
-    char char_stripe[MPI_MAX_INFO_VAL];
+    opal_cstring_t *stripe_str;
     /* Check the info object set during File_open */
-    opal_info_get (fh->f_info, "cb_nodes", MPI_MAX_INFO_VAL, char_stripe, &flag);
+    opal_info_get (fh->f_info, "cb_nodes", &stripe_str, &flag);
     if ( flag ) {
-        sscanf ( char_stripe, "%d", &num_cb_nodes );
-        OMPIO_MCA_PRINT_INFO(fh, "cb_nodes", char_stripe, "");
+        sscanf ( stripe_str->string, "%d", &num_cb_nodes );
+        OMPIO_MCA_PRINT_INFO(fh, "cb_nodes", stripe_str->string, "");
+        OBJ_RELEASE(stripe_str);
     }
     else {
         /* Check the info object set during file_set_view */
-        opal_info_get (info, "cb_nodes", MPI_MAX_INFO_VAL, char_stripe, &flag);
+        opal_info_get (info, "cb_nodes", &stripe_str, &flag);
         if ( flag ) {
-            sscanf ( char_stripe, "%d", &num_cb_nodes );
-            OMPIO_MCA_PRINT_INFO(fh, "cb_nodes", char_stripe, "");
+            sscanf ( stripe_str->string, "%d", &num_cb_nodes );
+            OMPIO_MCA_PRINT_INFO(fh, "cb_nodes", stripe_str->string, "");
+            OBJ_RELEASE(stripe_str);
         }
     }
         
@@ -303,23 +325,25 @@ int mca_common_ompio_set_view (ompio_file_t *fh,
     }
 
     bool info_is_set=false;
-    opal_info_get (fh->f_info, "collective_buffering", MPI_MAX_INFO_VAL, char_stripe, &flag);
+    opal_info_get (fh->f_info, "collective_buffering", &stripe_str, &flag);
     if ( flag ) {
-        if ( strncmp ( char_stripe, "false", sizeof("true") )){
+        if ( strncmp ( stripe_str->string, "false", sizeof("true") )){
             info_is_set = true;
-            OMPIO_MCA_PRINT_INFO(fh, "collective_buffering", char_stripe, "enforcing using individual fcoll component");
+            OMPIO_MCA_PRINT_INFO(fh, "collective_buffering", stripe_str->string, "enforcing using individual fcoll component");
         } else {
-            OMPIO_MCA_PRINT_INFO(fh, "collective_buffering", char_stripe, "");
+            OMPIO_MCA_PRINT_INFO(fh, "collective_buffering", stripe_str->string, "");
         }
+        OBJ_RELEASE(stripe_str);
     } else {
-        opal_info_get (info, "collective_buffering", MPI_MAX_INFO_VAL, char_stripe, &flag);
+        opal_info_get (info, "collective_buffering", &stripe_str, &flag);
         if ( flag ) {
-            if ( strncmp ( char_stripe, "false", sizeof("true") )){
+            if ( strncmp ( stripe_str->string, "false", sizeof("true") )){
                 info_is_set = true;
-                OMPIO_MCA_PRINT_INFO(fh, "collective_buffering", char_stripe, "enforcing using individual fcoll component");
+                OMPIO_MCA_PRINT_INFO(fh, "collective_buffering", stripe_str->string, "enforcing using individual fcoll component");
             } else {
-                OMPIO_MCA_PRINT_INFO(fh, "collective_buffering", char_stripe, "");
+                OMPIO_MCA_PRINT_INFO(fh, "collective_buffering", stripe_str->string, "");
             }
+            OBJ_RELEASE(stripe_str);
         }
     }
 

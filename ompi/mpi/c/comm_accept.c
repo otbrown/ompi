@@ -101,7 +101,15 @@ int MPI_Comm_accept(const char *port_name, MPI_Info info, int root,
      * if ( rank == root && MPI_INFO_NULL != info ) {
      * }
      */
-    OPAL_CR_ENTER_LIBRARY();
+
+#if OPAL_ENABLE_FT_MPI
+    /*
+     * We must not call ompi_comm_iface_create_check() here, because that
+     * risks leaving the connect side dangling on an unmatched operation.
+     * We will let the connect_accept logic proceed and discover the
+     * issue internally so that all sides get informed.
+     */
+#endif
 
     if ( rank == root ) {
 	rc = ompi_dpm_connect_accept (comm, root, port_name, send_first,
@@ -112,7 +120,6 @@ int MPI_Comm_accept(const char *port_name, MPI_Info info, int root,
 				      &newcomp);
     }
 
-    OPAL_CR_EXIT_LIBRARY();
 
     if (OPAL_ERR_NOT_SUPPORTED == rc) {
         opal_show_help("help-mpi-api.txt",

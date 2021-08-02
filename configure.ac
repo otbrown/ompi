@@ -28,6 +28,8 @@
 # Copyright (c) 2018      FUJITSU LIMITED.  All rights reserved.
 # Copyright (c) 2019      Triad National Security, LLC. All rights
 #                         reserved.
+# Copyright (c) 2020      Amazon.com, Inc. or its affiliates.
+#                         All Rights reserved.
 # $COPYRIGHT$
 #
 # Additional copyrights may follow
@@ -115,6 +117,44 @@ AM_SILENT_RULES([yes])
 # Make configure depend on the VERSION file, since it's used in AC_INIT
 AC_SUBST([CONFIGURE_DEPENDENCIES], ['$(top_srcdir)/VERSION'])
 
+# Sanity checks
+AC_DEFUN([OMPI_CHECK_DIR_FOR_SPACES],[
+    dir="$1"
+    article="$2"
+    label="$3"
+
+    AC_MSG_CHECKING([directory of $label])
+    AC_MSG_RESULT([$dir])
+    AS_IF([test -n "`echo $dir | grep ' '`"],
+          [AC_MSG_WARN([This version of Open MPI does not support $article $label])
+           AC_MSG_WARN([with a path that contains spaces])
+           AC_MSG_ERROR([Cannot continue.])])
+])
+
+AC_DEFUN([OMPI_CANONICALIZE_PATH],[
+    case $host_os in
+    darwin*)
+        # MacOS does not have "readlink -f" or realpath (at least as
+        # of MacOS Cataline / 10.15).  Instead, use Python, because we
+        # know MacOS comes with a /usr/bin/python that has
+        # os.path.realpath.
+        $2=`/usr/bin/python -c 'import os; print os.path.realpath("'$1'")'`
+        ;;
+    *)
+        $2=`readlink -f $1`
+        ;;
+    esac
+])
+
+OMPI_CHECK_DIR_FOR_SPACES([$srcdir], [a], [source tree])
+OMPI_CANONICALIZE_PATH([$srcdir], [ompi_dir])
+OMPI_CHECK_DIR_FOR_SPACES([$ompi_dir], [an], [absolute source tree])
+OMPI_CANONICALIZE_PATH([.], [ompi_dir])
+OMPI_CHECK_DIR_FOR_SPACES([$ompi_dir], [a], [build tree])
+OMPI_CHECK_DIR_FOR_SPACES([$prefix], [a], [prefix])
+OMPI_CANONICALIZE_PATH([$prefix], [ompi_dir])
+OMPI_CHECK_DIR_FOR_SPACES([$ompi_dir], [an], [absolute prefix])
+
 opal_show_subtitle "Checking versions"
 
 # Get the version of OMPI that we are installing
@@ -177,7 +217,7 @@ AC_CONFIG_HEADERS([opal/include/opal_config.h])
 m4_ifdef([project_ompi],
          [AC_CONFIG_HEADERS([ompi/include/mpi.h])])
 m4_ifdef([project_oshmem],
-         [AC_CONFIG_HEADER([oshmem/include/shmem.h])])
+         [AC_CONFIG_HEADERS([oshmem/include/shmem.h])])
 
 opal_show_subtitle "Initialization, setup"
 
@@ -196,7 +236,6 @@ fi
 
 # Check for deprecated/deleted options
 OMPI_CHECK_DELETED_OPTIONS
-OMPI_CHECK_DEPRECATED_OPTIONS
 
 # Setup the top of the opal/include/opal_config.h file
 
@@ -253,7 +292,7 @@ m4_ifdef([project_oshmem],
 OPAL_CONFIGURE_OPTIONS
 OPAL_CHECK_OS_FLAVORS
 OPAL_CHECK_CUDA
-OPAL_CHECK_PMIX
+
 m4_ifdef([project_ompi], [OMPI_CONFIGURE_OPTIONS])
 m4_ifdef([project_oshmem], [OSHMEM_CONFIGURE_OPTIONS])
 
@@ -265,9 +304,9 @@ AS_IF([test "$enable_oshmem" != "no"], [project_oshmem_amc=true], [project_oshme
 m4_ifndef([project_oshmem], [project_oshmem_amc="no (not available)"])
 
 # Enable/Disable Software-Based Performance Counters Capability
-AC_ARG_ENABLE(spc,
-    AC_HELP_STRING([--enable-spc],
-                   [Enable software-based performance counters capability (default: disabled)]))
+AC_ARG_ENABLE([spc],
+    [AS_HELP_STRING([--enable-spc],
+                   [Enable software-based performance counters capability (default: disabled)])])
 if test "$enable_spc" = "yes"; then
     AC_MSG_RESULT([yes])
     SPC_ENABLE=1
@@ -289,7 +328,9 @@ fi
 
 # The library prefixes must be set before we call OPAL MCA.  Here is
 # as good a place as any.
-OPAL_SET_LIB_PREFIX([])
+m4_ifdef([project_opal],
+[OPAL_SET_LIB_NAME([open-pal])])
+
 m4_ifdef([project_ompi],
           [OMPI_SET_LIB_NAME([])])
 
@@ -302,8 +343,8 @@ m4_ifdef([project_ompi],
 # Part one of libtool magic.  Default to: enable shared, disable static.
 #
 
-AM_ENABLE_SHARED
-AM_DISABLE_STATIC
+AC_ENABLE_SHARED
+AC_DISABLE_STATIC
 
 # Must be called before OPAL_SETUP_CC to get the value of CC
 # before it is modified by the C99/C11 checks.
@@ -420,7 +461,9 @@ AC_CHECK_SIZEOF(_Bool)
 AC_CHECK_SIZEOF(char)
 AC_CHECK_SIZEOF(short)
 AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(unsigned int)
 AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(unsigned long)
 AC_CHECK_SIZEOF(long long)
 if test "$ac_cv_type_short_float" = yes; then
     AC_CHECK_SIZEOF(short float)
@@ -1072,28 +1115,36 @@ AC_INCLUDES_DEFAULT
 # checkpoint results
 AC_CACHE_SAVE
 
-###########################################################
+##################################
 #        Fault Tolerance
-#
-# The FT code in the OMPI trunk is currently broken. We don't
-# have an active maintainer for it at this time, and it isn't
-# clear if/when we will return to it. We have therefore removed
-# the configure options supporting it until such time as it
-# can be fixed.
-#
-# However, we recognize that there are researchers who use this
-# option on their independent branches. In such cases, simply
-# uncomment the line below to render the FT configure options
-# visible again
-#
-###########################################################
-dnl OPAL_SETUP_FT_OPTIONS
-###########################################################
-# The following line is always required as it contains the
-# AC_DEFINE and AM_CONDITIONAL calls that set variables used
-# throughout the build system. If the above line is commented
-# out, then those variables will be set to "off". Otherwise,
-# they are controlled by the options
+# Part1: must happen before prte
+##################################
+OPAL_SETUP_FT_OPTIONS
+
+##################################
+# 3rd-party packages not called ROMIO
+##################################
+opal_show_title "3rd-party packages"
+
+OPAL_3RDPARY_SUBDIRS=
+OPAL_3RDPARY_DIST_SUBDIRS=
+OPAL_3RDPARY_EXTRA_DIST=
+OPAL_3RDPARY_DISTCLEAN_DIRS=
+
+OPAL_CONFIG_LIBEVENT
+OPAL_CONFIG_HWLOC
+OPAL_CONFIG_PMIX
+OMPI_SETUP_PRRTE
+
+AC_SUBST(OPAL_3RDPARTY_SUBDIRS)
+AC_SUBST(OPAL_3RDPARTY_DIST_SUBDIRS)
+AC_SUBST(OPAL_3RDPARTY_EXTRA_DIST)
+AC_SUBST(OPAL_3RDPARTY_DISTCLEAN_DIRS)
+
+##################################
+#        Fault Tolerance
+# Part2: must happen after prte
+##################################
 OPAL_SETUP_FT
 
 ##################################
@@ -1193,12 +1244,6 @@ opal_show_title "Final top-level OMPI configuration"
 
 opal_show_subtitle "Libtool configuration"
 
-# Use the undocumented solaris_use_stlport4 libtool variable to turn off any
-# Cstd/stlport4 linkage. This allows Open MPI to be C++ STL agnostic.
-if test "x$opal_cv_c_compiler_vendor" = "xsun"; then
-    solaris_use_stlport4="yes"
-fi
-
 # Due to this thread:
 # https://www.open-mpi.org/community/lists/users/2013/02/21356.php and
 # a helpful tip from Dave Goodell, set the precious variables for
@@ -1247,18 +1292,6 @@ AC_SUBST(OPAL_DYN_LIB_SUFFIX)
 
 # Need the libtool executable before the rpathify stuff
 LT_OUTPUT
-
-##################################
-# PRRTE support
-##################################
-
-opal_show_title "Setup PRRTE support"
-
-m4_ifdef([project_prrte],
-         [OMPI_SETUP_PRRTE],
-         [OPAL_SUMMARY_ADD([[Miscellaneous]],[[PRRTE]],[prrte],[no (disabled)])
-          ompi_want_prrte=no])
-AM_CONDITIONAL(OMPI_WANT_PRRTE, test "$ompi_want_prrte" = "yes")
 
 ############################################################################
 # final compiler config
@@ -1329,10 +1362,13 @@ OPAL_SETUP_WRAPPER_FINAL
 # autoconf macro defines in mpi.h.  Since AC sometimes changes whether
 # things are defined as null tokens or an integer result, two projects
 # with different versions of AC can cause problems.
-if test $ac_cv_header_stdc = yes; then
-    AC_DEFINE(OPAL_STDC_HEADERS, 1,
-              [Do not use outside of mpi.h.  Define to 1 if you have the ANSI C header files.])
-fi
+
+# According to the autoconf 2.67 documentation the AC_HEADER_STDC macro,
+# and therefore the ac_cv_header_stdc cache variable, is obsolescent, as
+# current systems have conforming header files. Instead of removing the
+# protection completely, let's just make sure it is always on.
+AC_DEFINE(OPAL_STDC_HEADERS, 1,
+          [Do not use outside of mpi.h.  Define to 1 if you have the ANSI C header files.])
 if test $ac_cv_header_sys_time_h = yes ; then
     AC_DEFINE(OPAL_HAVE_SYS_TIME_H, 1,
               [Do not use outside of mpi.h.  Define to 1 if you have the <sys/time.h> header file.])
@@ -1443,11 +1479,12 @@ AC_CONFIG_FILES([
     contrib/dist/mofed/debian/control
     contrib/dist/mofed/debian/copyright:LICENSE
 
+    3rd-party/Makefile
+
     test/Makefile
     test/event/Makefile
     test/asm/Makefile
     test/datatype/Makefile
-    test/dss/Makefile
     test/class/Makefile
     test/mpool/Makefile
     test/support/Makefile

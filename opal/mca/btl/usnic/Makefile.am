@@ -27,7 +27,7 @@
 
 AM_CPPFLAGS = $(opal_ofi_CPPFLAGS) -DOMPI_LIBMPI_NAME=\"$(OMPI_LIBMPI_NAME)\"
 
-EXTRA_DIST = README.txt README.test
+EXTRA_DIST = README.md README.test
 
 dist_opaldata_DATA = \
     help-mpi-btl-usnic.txt
@@ -92,7 +92,7 @@ mca_btl_usnic_la_LDFLAGS = \
         $(opal_btl_usnic_LDFLAGS) \
         $(opal_ofi_LDFLAGS) \
         -module -avoid-version
-mca_btl_usnic_la_LIBADD = $(top_builddir)/opal/lib@OPAL_LIB_PREFIX@open-pal.la \
+mca_btl_usnic_la_LIBADD = $(top_builddir)/opal/lib@OPAL_LIB_NAME@.la \
         $(opal_ofi_LIBS)
 
 noinst_LTLIBRARIES = $(lib)

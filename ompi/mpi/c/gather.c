@@ -13,6 +13,7 @@
  * Copyright (c) 2006-2007 Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2008      University of Houston.  All rights reserved.
  * Copyright (c) 2008      Sun Microsystems, Inc.  All rights reserved.
+ * Copyright (c) 2010-2012 Oak Ridge National Labs.  All rights reserved.
  * Copyright (c) 2013      Los Alamos National Security, LLC.  All rights
  *                         reserved.
  * Copyright (c) 2015      Research Organization for Information Science
@@ -167,6 +168,17 @@ int MPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
         }
     }
 
+#if OPAL_ENABLE_FT_MPI
+    /*
+     * An early check, so as to return early if we are using a broken
+     * communicator. This is not absolutely necessary since we will
+     * check for this, and other, error conditions during the operation.
+     */
+    if( OPAL_UNLIKELY(!ompi_comm_iface_coll_check(comm, &err)) ) {
+        OMPI_ERRHANDLER_RETURN(err, comm, err, FUNC_NAME);
+    }
+#endif
+
     /* Do we need to do anything? */
 
     if ((0 == sendcount && MPI_ROOT != root &&
@@ -177,8 +189,6 @@ int MPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
         (0 == recvcount && (MPI_ROOT == root || MPI_PROC_NULL == root))) {
         return MPI_SUCCESS;
     }
-
-    OPAL_CR_ENTER_LIBRARY();
 
     /* Invoke the coll component to perform the back-end operation */
     err = comm->c_coll->coll_gather(sendbuf, sendcount, sendtype, recvbuf,

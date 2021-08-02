@@ -42,8 +42,9 @@ libmca_btl_sm_la_sources = \
     btl_sm_xpmem.h \
     btl_sm_knem.c \
     btl_sm_knem.h \
-    btl_sm_sc_emu.c \
-    btl_sm_atomic.c
+    btl_sm_types.h \
+    btl_sm_virtual.h
+
 
 # Make the output library in this directory, and name it either
 # mca_<type>_<name>.la (for DSO builds) or libmca_<type>_<name>.la
@@ -61,7 +62,7 @@ mcacomponentdir = $(opallibdir)
 mcacomponent_LTLIBRARIES = $(component_install)
 mca_btl_sm_la_SOURCES = $(libmca_btl_sm_la_sources)
 mca_btl_sm_la_LDFLAGS = -module -avoid-version $(btl_sm_LDFLAGS)
-mca_btl_sm_la_LIBADD = $(top_builddir)/opal/lib@OPAL_LIB_PREFIX@open-pal.la \
+mca_btl_sm_la_LIBADD = $(top_builddir)/opal/lib@OPAL_LIB_NAME@.la \
 	$(btl_sm_LIBS)
 
 noinst_LTLIBRARIES = $(component_noinst)

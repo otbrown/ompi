@@ -127,33 +127,31 @@ OPAL_DECLSPEC int opal_show_help_init(void);
  * promotion to va_start() has undefined behavior (according to clang
  * warnings on MacOS High Sierra).
  */
-typedef int (*opal_show_help_fn_t)(const char *filename, const char *topic,
-                                   int want_error_header, ...);
+typedef int (*opal_show_help_fn_t)(const char *filename, const char *topic, int want_error_header,
+                                   ...);
 OPAL_DECLSPEC extern opal_show_help_fn_t opal_show_help;
 
 /**
  * This function does the same thing as opal_show_help(), but accepts
  * a va_list form of varargs.
  */
-typedef int (*opal_show_vhelp_fn_t)(const char *filename, const char *topic,
-                                    int want_error_header, va_list ap);
+typedef int (*opal_show_vhelp_fn_t)(const char *filename, const char *topic, int want_error_header,
+                                    va_list ap);
 OPAL_DECLSPEC extern opal_show_vhelp_fn_t opal_show_vhelp;
 
 /**
  * This function does the same thing as opal_show_help(), but returns
  * its output in a string (that must be freed by the caller).
  */
-OPAL_DECLSPEC char* opal_show_help_string(const char *filename,
-                                          const char *topic,
+OPAL_DECLSPEC char *opal_show_help_string(const char *filename, const char *topic,
                                           int want_error_header, ...);
 
 /**
  * This function does the same thing as opal_show_help_string(), but
  * accepts a va_list form of varargs.
  */
-OPAL_DECLSPEC char* opal_show_help_vstring(const char *filename,
-                                          const char *topic,
-                                          int want_error_header, va_list ap);
+OPAL_DECLSPEC char *opal_show_help_vstring(const char *filename, const char *topic,
+                                           int want_error_header, va_list ap);
 
 /**
  * This function adds another search location for the files that
@@ -165,8 +163,7 @@ OPAL_DECLSPEC char* opal_show_help_vstring(const char *filename,
  * of the show_help functionality. OMPI defines the show_help directory
  * based on where OMPI was installed. However, if the library wants to
  * use show_help to provide error output specific to itself, then it
- * nees to tell show_help how to find its own show_help files - without
- * interfering with the linked ORTE libs when they need to do show_help.
+ * nees to tell show_help how to find its own show_help files.
  */
 OPAL_DECLSPEC int opal_show_help_add_dir(const char *directory);
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2010 The Trustees of Indiana University and Indiana
  *                         University Research and Technology
  *                         Corporation.  All rights reserved.
- * Copyright (c) 2004-2014 The University of Tennessee and The University
+ * Copyright (c) 2004-2019 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2004-2005 High Performance Computing Center Stuttgart,
@@ -24,6 +24,9 @@
  *
  * Copyright (c) 2016-2017 IBM Corporation. All rights reserved.
  * Copyright (c) 2018      FUJITSU LIMITED.  All rights reserved.
+ * Copyright (c) 2020      Amazon.com, Inc. or its affiliates.
+ *                         All Rights reserved.
+ * Copyright (c) 2021      Nanook Consulting.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -54,7 +57,7 @@
 #include "opal/util/stacktrace.h"
 #include "opal/util/show_help.h"
 #include "opal/runtime/opal.h"
-#include "opal/mca/event/event.h"
+#include "opal/util/event.h"
 #include "opal/mca/allocator/base/base.h"
 #include "opal/mca/rcache/base/base.h"
 #include "opal/mca/rcache/rcache.h"
@@ -96,12 +99,6 @@
 #include "ompi/mpiext/mpiext.h"
 #include "ompi/mca/hook/base/base.h"
 #include "ompi/util/timings.h"
-
-#if OPAL_ENABLE_FT_CR == 1
-#include "ompi/mca/crcp/crcp.h"
-#include "ompi/mca/crcp/base/base.h"
-#endif
-#include "ompi/runtime/ompi_cr.h"
 
 /* newer versions of gcc have poisoned this deprecated feature */
 #ifdef HAVE___MALLOC_INITIALIZE_HOOK
@@ -359,6 +356,17 @@ static int ompi_register_mca_variables(void)
                                  MCA_BASE_VAR_SCOPE_READONLY,
                                  &ompi_enable_timing);
 
+#if OPAL_ENABLE_FT_MPI
+    /* Before loading any other part of the MPI library, we need to load
+     * the ft-mpi tune file to override default component selection when
+     * FT is desired ON; this does override openmpi-params.conf, but not
+     * command line or env.
+     */
+    if( ompi_ftmpi_enabled ) {
+        mca_base_var_load_extra_files("ft-mpi", false);
+    }
+#endif /* OPAL_ENABLE_FT_MPI */
+
     return OMPI_SUCCESS;
 }
 
@@ -388,12 +396,15 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
     ompi_proc_t** procs;
     size_t nprocs;
     char *error = NULL;
+    char *evar;
     volatile bool active;
     bool background_fence = false;
     pmix_info_t info[2];
+    pmix_status_t codes[1] = { PMIX_ERR_PROC_ABORTED };
     pmix_status_t rc;
     OMPI_TIMING_INIT(64);
     opal_pmix_lock_t mylock;
+    opal_process_name_t pname;
 
     ompi_hook_base_mpi_init_top(argc, argv, requested, provided);
 
@@ -428,6 +439,14 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
         }
     }
 
+    /* deal with OPAL_PREFIX to ensure that an internal PMIx installation
+     * is also relocated if necessary */
+#if OPAL_USING_INTERNAL_PMIX
+    if (NULL != (evar = getenv("OPAL_PREFIX"))) {
+        opal_setenv("PMIX_PREFIX", evar, true, &environ);
+    }
+#endif
+
     /* Figure out the final MPI thread levels.  If we were not
        compiled for support for MPI threads, then don't allow
        MPI_THREAD_MULTIPLE.  Set this stuff up here early in the
@@ -437,6 +456,7 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
     ompi_mpi_thread_level(requested, provided);
 
     /* Setup enough to check get/set MCA params */
+    memset(&opal_process_info, 0, sizeof(opal_process_info));
     if (OPAL_SUCCESS != (ret = opal_init_util(&argc, &argv))) {
         error = "ompi_mpi_init: opal_init_util failed";
         goto error;
@@ -459,6 +479,40 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
     /* Register MCA variables */
     if (OPAL_SUCCESS != (ret = ompi_register_mca_variables())) {
         error = "ompi_mpi_init: ompi_register_mca_variables failed";
+        goto error;
+    }
+
+    /* setup our internal nspace hack */
+    opal_pmix_setup_nspace_tracker();
+    /* init PMIx */
+    if (PMIX_SUCCESS != (ret = PMIx_Init(&opal_process_info.myprocid, NULL, 0))) {
+        /* if we get PMIX_ERR_UNREACH indicating that we cannot reach the
+         * server, then we assume we are operating as a singleton */
+        if (PMIX_ERR_UNREACH == ret) {
+            ompi_singleton = true;
+        } else {
+            /* we cannot run - this could be due to being direct launched
+             * without the required PMI support being built, so print
+             * out a help message indicating it */
+            opal_show_help("help-mpi-runtime.txt", "no-pmi", true, PMIx_Error_string(ret));
+            return OPAL_ERR_SILENT;
+        }
+    }
+    /* setup the process name fields - also registers the new nspace */
+    OPAL_PMIX_CONVERT_PROCT(ret, &pname, &opal_process_info.myprocid);
+    if (OPAL_SUCCESS != ret) {
+        error = "ompi_mpi_init: converting process name";
+        goto error;
+    }
+    OPAL_PROC_MY_NAME.jobid = pname.jobid;
+    OPAL_PROC_MY_NAME.vpid = pname.vpid;
+    opal_process_info.my_name.jobid = OPAL_PROC_MY_NAME.jobid;
+    opal_process_info.my_name.vpid = OPAL_PROC_MY_NAME.vpid;
+
+    /* get our topology and cache line size */
+    ret = opal_hwloc_base_get_topology();
+    if (OPAL_SUCCESS != ret) {
+        error = "ompi_mpi_init: get topology";
         goto error;
     }
 
@@ -514,6 +568,11 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
     OMPI_TIMING_IMPORT_OPAL("rte_init");
 
     ompi_rte_initialized = true;
+    /* if we are oversubscribed, then set yield_when_idle
+     * accordingly */
+    if (ompi_mpi_oversubscribed) {
+        ompi_mpi_yield_when_idle = true;
+    }
 
     /* Register the default errhandler callback  */
     /* we want to go first */
@@ -521,7 +580,7 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
     /* give it a name so we can distinguish it */
     PMIX_INFO_LOAD(&info[1], PMIX_EVENT_HDLR_NAME, "MPI-Default", PMIX_STRING);
     OPAL_PMIX_CONSTRUCT_LOCK(&mylock);
-    PMIx_Register_event_handler(NULL, 0, info, 2, ompi_errhandler_callback, evhandler_reg_callbk, (void*)&mylock);
+    PMIx_Register_event_handler(codes, 1, info, 2, ompi_errhandler_callback, evhandler_reg_callbk, (void*)&mylock);
     OPAL_PMIX_WAIT_THREAD(&mylock);
     rc = mylock.status;
     OPAL_PMIX_DESTRUCT_LOCK(&mylock);
@@ -609,13 +668,6 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
         error = "ompi_osc_base_open() failed";
         goto error;
     }
-
-#if OPAL_ENABLE_FT_CR == 1
-    if (OMPI_SUCCESS != (ret = mca_base_framework_open(&ompi_crcp_base_framework, 0))) {
-        error = "ompi_crcp_base_open() failed";
-        goto error;
-    }
-#endif
 
     /* In order to reduce the common case for MPI apps (where they
        don't use MPI-2 IO or MPI-1 topology functions), the io and
@@ -729,13 +781,6 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
         goto error;
     }
 
-#if OPAL_ENABLE_FT_CR == 1
-    if (OMPI_SUCCESS != (ret = ompi_crcp_base_select() ) ) {
-        error = "ompi_crcp_base_select() failed";
-        goto error;
-    }
-#endif
-
     /* io and topo components are not selected here -- see comment
        above about the io and topo frameworks being loaded lazily */
 
@@ -825,7 +870,7 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
      * convey this requirement */
     if (mca_pml_base_requires_world ()) {
         if (NULL == (procs = ompi_proc_world (&nprocs))) {
-            error = "ompi_proc_get_allocated () failed";
+            error = "ompi_proc_world () failed";
             goto error;
         }
     } else {
@@ -853,6 +898,27 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
 
     MCA_PML_CALL(add_comm(&ompi_mpi_comm_world.comm));
     MCA_PML_CALL(add_comm(&ompi_mpi_comm_self.comm));
+
+#if OPAL_ENABLE_FT_MPI
+    /* initialize the fault tolerant infrastructure (revoke, detector,
+     * propagator) */
+    if( ompi_ftmpi_enabled ) {
+        const char *evmethod;
+        rc = ompi_comm_rbcast_init();
+        if( OMPI_SUCCESS != rc ) return rc;
+        rc = ompi_comm_revoke_init();
+        if( OMPI_SUCCESS != rc ) return rc;
+        rc = ompi_comm_failure_propagator_init();
+        if( OMPI_SUCCESS != rc ) return rc;
+        rc = ompi_comm_failure_detector_init();
+        if( OMPI_SUCCESS != rc ) return rc;
+
+        evmethod = event_base_get_method(opal_sync_event_base);
+        if( 0 == strcmp("select", evmethod) ) {
+            opal_show_help("help-mpi-ft.txt", "module:event:selectbug", true);
+        }
+    }
+#endif
 
     /*
      * Dump all MCA parameters if requested
@@ -957,23 +1023,6 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
         goto error;
     }
 
-    /*
-     * Startup the Checkpoint/Restart Mech.
-     * Note: Always do this so tools don't hang when
-     * in a non-checkpointable build
-     */
-    if (OMPI_SUCCESS != (ret = ompi_cr_init())) {
-        error = "ompi_cr_init";
-        goto error;
-    }
-
-    /* Undo OPAL calling opal_progress_event_users_increment() during
-       opal_init, to get better latency when not using TCP.  Do
-       this *after* dyn_init, as dyn init uses lots of RTE
-       communication and we don't want to hinder the performance of
-       that code. */
-    opal_progress_event_users_decrement();
-
     /* see if yield_when_idle was specified - if so, use it */
     opal_progress_set_yield_when_idle(ompi_mpi_yield_when_idle);
 
@@ -991,6 +1040,14 @@ int ompi_mpi_init(int argc, char **argv, int requested, int *provided,
         error = "ompi_mpiext_init";
         goto error;
     }
+
+#if OPAL_ENABLE_FT_MPI
+    /* start the failure detector */
+    if( ompi_ftmpi_enabled ) {
+        rc = ompi_comm_failure_detector_start();
+        if( OMPI_SUCCESS != rc ) return rc;
+    }
+#endif
 
     /* Fall through */
  error:

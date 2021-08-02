@@ -1,6 +1,6 @@
 dnl -*- shell-script -*-
 dnl
-dnl Copyright (c) 2018-2020 FUJITSU LIMITED.  All rights reserved.
+dnl Copyright (c) 2018-2021 FUJITSU LIMITED.  All rights reserved.
 dnl Copyright (c) 2020 Cisco Systems, Inc.  All rights reserved.
 dnl $COPYRIGHT$
 dnl
@@ -16,9 +16,9 @@ dnl ------------------------------------------------------------
 AC_DEFUN([OPAL_CHECK_ALT_SHORT_FLOAT], [
     AC_CHECK_TYPES(_Float16)
     AC_MSG_CHECKING([if want alternate C type of short float])
-    AC_ARG_ENABLE(alt-short-float,
-        AC_HELP_STRING([--enable-alt-short-float=TYPE],
-                       [Use an alternate C type TYPE of 'short float' if 'short float' is not available on the C compiler. 'short float' is a new C type proposed for the next C language standard in ISO/IEC JTC 1/SC 22 WG 14 (C WG). (default: "_Float16" if available, disabled otherwise)]))
+    AC_ARG_ENABLE([alt-short-float],
+        [AS_HELP_STRING([--enable-alt-short-float=TYPE],
+                       [Use an alternate C type TYPE of 'short float' if 'short float' is not available on the C compiler. 'short float' is a new C type proposed for the next C language standard in ISO/IEC JTC 1/SC 22 WG 14 (C WG). (default: "_Float16" if available, disabled otherwise)])])
     if test "$enable_alt_short_float" = "yes"; then
         AC_MSG_ERROR([--enable-alt-short-float must have an argument.])
     elif test "$enable_alt_short_float" = "no"; then
@@ -47,9 +47,9 @@ AC_DEFUN([OPAL_CHECK_ALT_SHORT_FLOAT], [
         # automagically add that flag -- we'll just emit a warning and
         # point the user to a README where more information is
         # available.
-        AC_MSG_CHECKING([if compiler supports arithmetic operations on $opal_short_float_type])
         AS_IF([test $opal_alt_short_float_exists -eq 1],
-              [AC_LINK_IFELSE([AC_LANG_PROGRAM([], [[
+              [AC_MSG_CHECKING([if compiler supports arithmetic operations on $opal_short_float_type])
+               AC_LINK_IFELSE([AC_LANG_PROGRAM([], [[
 static $opal_short_float_type a = 2.5, b = 3.8;
 a += b;]])],
                                  [AC_MSG_RESULT([yes])
@@ -74,6 +74,29 @@ a += b;]])],
             AC_CHECK_SIZEOF(opal_short_float_t)
             AC_CHECK_SIZEOF(opal_short_float_complex_t)
             OPAL_C_GET_ALIGNMENT(opal_short_float_t, OPAL_ALIGNMENT_OPAL_SHORT_FLOAT_T)
+
+            # Some versions of GCC (around 9.1.0?) emit a warning for _Float16
+            # when compiling with -pedantic. Using __extension__ can suppress
+            # the warning. The warning can be detected by -Werror in configure.
+            # See https://github.com/open-mpi/ompi/issues/8840
+            AC_MSG_CHECKING([if $opal_short_float_type needs __extension__ keyword])
+            opal_alt_short_float_needs_extension=0
+            OPAL_VAR_SCOPE_PUSH([CFLAGS_save])
+            CFLAGS_save=$CFLAGS
+            CFLAGS="-Werror $CFLAGS"
+            AC_COMPILE_IFELSE([AC_LANG_SOURCE([$opal_short_float_type a;])],
+                              [AC_MSG_RESULT([no])],
+                              [AC_COMPILE_IFELSE([AC_LANG_SOURCE([__extension__ $opal_short_float_type a;])],
+                                                 [opal_alt_short_float_needs_extension=1
+                                                  AC_MSG_RESULT([yes])],
+                                                 [AC_MSG_RESULT([no])])])
+            CFLAGS=$CFLAGS_save
+            OPAL_VAR_SCOPE_POP
+            AC_DEFINE_UNQUOTED(OPAL_SHORT_FLOAT_TYPE, [[$opal_short_float_type]],
+                               [User-selected alternate C type of short float (used to redefine opal_short_float_t in opal_bottom.h)])
+            AC_DEFINE_UNQUOTED(OPAL_SHORT_FLOAT_NEEDS_EXTENSION,
+                               [$opal_alt_short_float_needs_extension],
+                               [Whether $opal_short_float_type needs __extension__ keyword])
         elif test "$enable_alt_short_float" != ""; then
             AC_MSG_ERROR([Alternate C type of short float $opal_short_float_type requested but not available.  Aborting])
         fi

@@ -24,10 +24,68 @@ include $(top_srcdir)/Makefile.ompi-rules
 # https://rmarkdown.rstudio.com/authoring_pandoc_markdown.html
 
 MD_FILES = \
+        MPI_Barrier.3.md \
+        MPI_Bsend.3.md \
+        MPI_Bsend_init.3.md \
+        MPI_Buffer_attach.3.md \
+        MPI_Buffer_detach.3.md \
+        MPI_Cancel.3.md \
+        MPI_Cart_coords.3.md \
+        MPI_Cart_create.3.md \
+        MPI_Cart_get.3.md \
+        MPI_Cart_map.3.md \
+        MPI_Cart_rank.3.md \
+        MPI_Cart_shift.3.md \
+        MPI_Close_port.3.md \
+        MPI_Cart_sub.3.md \
+        MPI_Cartdim_get.3.md \
+        MPI_Comm_accept.3.md \
+        MPI_Comm_call_errhandler.3.md \
+        MPI_Comm_compare.3.md \
+        MPI_Comm_connect.3.md \
+        MPI_Comm_create.3.md \
+        MPI_Comm_create_errhandler.3.md \
+        MPI_Comm_create_group.3.md \
+        MPI_Comm_create_keyval.3.md \
+        MPI_Comm_delete_attr.3.md \
+        MPI_Comm_disconnect.3.md \
+        MPI_Comm_dup.3.md \
+        MPI_Comm_dup_with_info.3.md \
         MPI_T_init_thread.3.md \
         MPI_Status_f2c.3.md \
         MPI_Status_f082c.3.md \
-        MPI_Status_f082f.3.md
+        MPI_Status_f082f.3.md \
+        MPI_Bcast.3.md \
+        MPI_File_write_ordered.3.md \
+        MPI_File_write_ordered_begin.3.md \
+        MPI_File_write_ordered_end.3.md \
+        MPI_File_write_shared.3.md \
+        MPI_Finalize.3.md \
+        MPI_Finalized.3.md \
+        MPI_Free_mem.3.md \
+        MPI_Gather.3.md \
+        MPI_Gatherv.3.md \
+        MPI_Get.3.md \
+        MPI_Get_accumulate.3.md \
+        MPI_Get_address.3.md \
+        MPI_Get_count.3.md \
+        MPI_Get_elements.3.md \
+        MPI_Get_library_version.3.md \
+        MPI_Get_processor_name.3.md \
+        MPI_Get_version.3.md \
+        MPI_Graph_create.3.md \
+        MPI_Graph_get.3.md \
+        MPI_Graph_map.3.md \
+        MPI_Graph_neighbors_count.3.md \
+        MPI_Graphdims_get.3.md \
+        MPI_Grequest_complete.3.md \
+        MPI_Grequest_start.3.md \
+        MPI_Group_compare.3.md \
+        MPI_Group_difference.3.md \
+        MPI_Group_excl.3.md \
+        MPI_Group_free.3.md \
+        MPI_Group_incl.3.md \
+        MPI_Group_intersection.3.md
 
 TEMPLATE_FILES = \
         MPI_Abort.3in \
@@ -54,37 +112,9 @@ TEMPLATE_FILES = \
         MPI_Attr_delete.3in \
         MPI_Attr_get.3in \
         MPI_Attr_put.3in \
-        MPI_Barrier.3in \
         MPI_Ibarrier.3in \
-        MPI_Bcast.3in \
         MPI_Ibcast.3in \
-        MPI_Bsend.3in \
-        MPI_Bsend_init.3in \
-        MPI_Buffer_attach.3in \
-        MPI_Buffer_detach.3in \
-        MPI_Cancel.3in \
-        MPI_Cart_coords.3in \
-        MPI_Cart_create.3in \
-        MPI_Cartdim_get.3in \
-        MPI_Cart_get.3in \
-        MPI_Cart_map.3in \
-        MPI_Cart_rank.3in \
-        MPI_Cart_shift.3in \
-        MPI_Cart_sub.3in \
-        MPI_Close_port.3in \
-        MPI_Comm_accept.3in \
         MPI_Comm_c2f.3in \
-        MPI_Comm_call_errhandler.3in \
-        MPI_Comm_compare.3in \
-        MPI_Comm_connect.3in \
-        MPI_Comm_create.3in \
-        MPI_Comm_create_group.3in \
-        MPI_Comm_create_errhandler.3in \
-        MPI_Comm_create_keyval.3in \
-        MPI_Comm_delete_attr.3in \
-        MPI_Comm_disconnect.3in \
-        MPI_Comm_dup.3in \
-        MPI_Comm_dup_with_info.3in \
         MPI_Comm_idup.3in \
         MPI_Comm_f2c.3in \
         MPI_Comm_free.3in \
@@ -181,42 +211,12 @@ TEMPLATE_FILES = \
         MPI_File_write_at_all.3in \
         MPI_File_write_at_all_begin.3in \
         MPI_File_write_at_all_end.3in \
-        MPI_File_write_ordered.3in \
-        MPI_File_write_ordered_begin.3in \
-        MPI_File_write_ordered_end.3in \
-        MPI_File_write_shared.3in \
-        MPI_Finalize.3in \
-        MPI_Finalized.3in \
-        MPI_Free_mem.3in \
-        MPI_Gather.3in \
         MPI_Igather.3in \
-        MPI_Gatherv.3in \
         MPI_Igatherv.3in \
-        MPI_Get.3in \
-        MPI_Get_accumulate.3in \
-        MPI_Get_address.3in \
-        MPI_Get_count.3in \
-        MPI_Get_elements.3in \
         MPI_Get_elements_x.3in \
-        MPI_Get_library_version.3in \
-        MPI_Get_processor_name.3in \
-        MPI_Get_version.3in \
-        MPI_Graph_create.3in \
-        MPI_Graphdims_get.3in \
-        MPI_Graph_get.3in \
-        MPI_Graph_map.3in \
         MPI_Graph_neighbors.3in \
-        MPI_Graph_neighbors_count.3in \
-        MPI_Grequest_complete.3in \
-        MPI_Grequest_start.3in \
         MPI_Group_c2f.3in \
-        MPI_Group_compare.3in \
-        MPI_Group_difference.3in \
-        MPI_Group_excl.3in \
         MPI_Group_f2c.3in \
-        MPI_Group_free.3in \
-        MPI_Group_incl.3in \
-        MPI_Group_intersection.3in \
         MPI_Group_range_excl.3in \
         MPI_Group_range_incl.3in \
         MPI_Group_rank.3in \

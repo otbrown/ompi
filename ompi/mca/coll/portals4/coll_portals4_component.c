@@ -24,14 +24,14 @@
 
 #include "ompi_config.h"
 
+#include "ompi/datatype/ompi_datatype.h"
+#include "ompi/datatype/ompi_datatype_internal.h"
+#include "ompi/mca/coll/base/base.h"
+#include "ompi/mca/coll/coll.h"
+#include "ompi/op/op.h"
+
 #include "coll_portals4.h"
 #include "coll_portals4_request.h"
-
-#include "mpi.h"
-#include "ompi/op/op.h"
-#include "ompi/datatype/ompi_datatype_internal.h"
-#include "ompi/mca/coll/coll.h"
-#include "ompi/mca/coll/base/base.h"
 
 #define REQ_COLL_TABLE_ID           15
 #define REQ_COLL_FINISH_TABLE_ID    16
@@ -167,7 +167,7 @@ mca_coll_portals4_component_t mca_coll_portals4_component = {
          * about the component itself */
 
         .collm_version = {
-            MCA_COLL_BASE_VERSION_2_0_0,
+            MCA_COLL_BASE_VERSION_2_4_0,
 
             /* Component name and version */
             .mca_component_name = "portals4",
@@ -618,7 +618,6 @@ portals4_comm_query(struct ompi_communicator_t *comm,
     *priority = mca_coll_portals4_priority;
     portals4_module->coll_count = 0;
     portals4_module->super.coll_module_enable = portals4_module_enable;
-    portals4_module->super.ft_event = NULL;
 
     portals4_module->super.coll_barrier = ompi_coll_portals4_barrier_intra;
     portals4_module->super.coll_ibarrier = ompi_coll_portals4_ibarrier_intra;

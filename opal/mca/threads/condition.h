@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2007 The Trustees of Indiana University and Indiana
  *                         University Research and Technology
  *                         Corporation.  All rights reserved.
- * Copyright (c) 2004-2005 The University of Tennessee and The University
+ * Copyright (c) 2004-2020 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2004-2005 High Performance Computing Center Stuttgart,
@@ -30,15 +30,14 @@
 
 #include "opal_config.h"
 #ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
+#    include <sys/time.h>
 #endif
-#include <time.h>
 #include <pthread.h>
+#include <time.h>
 
+#include "opal/constants.h"
 #include "opal/mca/threads/mutex.h"
 #include "opal/runtime/opal_progress.h"
-
-#include "opal/runtime/opal_cr.h"
 
 BEGIN_C_DECLS
 
@@ -56,7 +55,6 @@ typedef struct opal_condition_t opal_condition_t;
 
 OPAL_DECLSPEC OBJ_CLASS_DECLARATION(opal_condition_t);
 
-
 static inline int opal_condition_wait(opal_condition_t *c, opal_mutex_t *m)
 {
     int rc = OPAL_SUCCESS;
@@ -67,20 +65,17 @@ static inline int opal_condition_wait(opal_condition_t *c, opal_mutex_t *m)
             c->c_waiting--;
             opal_mutex_unlock(m);
             opal_progress();
-            OPAL_CR_TEST_CHECKPOINT_READY_STALL();
             opal_mutex_lock(m);
             return rc;
         }
         while (0 == c->c_signaled) {
             opal_mutex_unlock(m);
             opal_progress();
-            OPAL_CR_TEST_CHECKPOINT_READY_STALL();
             opal_mutex_lock(m);
         }
     } else {
         while (0 == c->c_signaled) {
             opal_progress();
-            OPAL_CR_TEST_CHECKPOINT_READY_STALL();
         }
     }
 
@@ -107,9 +102,9 @@ static inline int opal_condition_timedwait(opal_condition_t *c, opal_mutex_t *m,
                 opal_progress();
                 gettimeofday(&tv, NULL);
                 opal_mutex_lock(m);
-            } while (0 == c->c_signaled && (tv.tv_sec <= absolute.tv_sec ||
-                                            (tv.tv_sec == absolute.tv_sec &&
-                                             tv.tv_usec < absolute.tv_usec)));
+            } while (0 == c->c_signaled
+                     && (tv.tv_sec <= absolute.tv_sec
+                         || (tv.tv_sec == absolute.tv_sec && tv.tv_usec < absolute.tv_usec)));
         }
     } else {
         absolute.tv_sec = abstime->tv_sec;
@@ -119,9 +114,9 @@ static inline int opal_condition_timedwait(opal_condition_t *c, opal_mutex_t *m,
             do {
                 opal_progress();
                 gettimeofday(&tv, NULL);
-            } while (0 == c->c_signaled && (tv.tv_sec <= absolute.tv_sec ||
-                                            (tv.tv_sec == absolute.tv_sec &&
-                                             tv.tv_usec < absolute.tv_usec)));
+            } while (0 == c->c_signaled
+                     && (tv.tv_sec <= absolute.tv_sec
+                         || (tv.tv_sec == absolute.tv_sec && tv.tv_usec < absolute.tv_usec)));
         }
     }
 

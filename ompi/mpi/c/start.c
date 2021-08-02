@@ -10,6 +10,7 @@
  * Copyright (c) 2004-2005 The Regents of the University of California.
  *                         All rights reserved.
  * Copyright (c) 2006      Cisco Systems, Inc.  All rights reserved.
+ * Copyright (c) 2010-2012 Oak Ridge National Labs.  All rights reserved.
  * Copyright (c) 2015-2017 Research Organization for Information Science
  *                         and Technology (RIST). All rights reserved.
  * Copyright (c) 2017      FUJITSU LIMITED.  All rights reserved.
@@ -65,17 +66,22 @@ int MPI_Start(MPI_Request *request)
      * be reused or not (it is PML completed or not?).
      */
 
+#if OPAL_ENABLE_FT_MPI
+    /*
+     * The request will be checked for process failure errors during the
+     * completion calls. So no need to check here.
+     */
+#endif
+
     switch((*request)->req_type) {
     case OMPI_REQUEST_PML:
     case OMPI_REQUEST_COLL:
         if ( MPI_PARAM_CHECK && !(*request)->req_persistent) {
             return OMPI_ERRHANDLER_NOHANDLE_INVOKE(MPI_ERR_REQUEST, FUNC_NAME);
         }
-        OPAL_CR_ENTER_LIBRARY();
 
         ret = (*request)->req_start(1, request);
 
-        OPAL_CR_EXIT_LIBRARY();
         return ret;
 
     case OMPI_REQUEST_NOOP:

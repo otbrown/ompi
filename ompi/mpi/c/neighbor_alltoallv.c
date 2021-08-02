@@ -142,7 +142,16 @@ int MPI_Neighbor_alltoallv(const void *sendbuf, const int sendcounts[], const in
         }
     }
 
-    OPAL_CR_ENTER_LIBRARY();
+#if OPAL_ENABLE_FT_MPI
+    /*
+     * An early check, so as to return early if we are using a broken
+     * communicator. This is not absolutely necessary since we will
+     * check for this, and other, error conditions during the operation.
+     */
+    if( OPAL_UNLIKELY(!ompi_comm_iface_coll_check(comm, &err)) ) {
+        OMPI_ERRHANDLER_RETURN(err, comm, err, FUNC_NAME);
+    }
+#endif
 
     /* Invoke the coll component to perform the back-end operation */
     err = comm->c_coll->coll_neighbor_alltoallv(sendbuf, sendcounts, sdispls, sendtype,

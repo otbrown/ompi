@@ -11,6 +11,7 @@
  * Copyright (c) 2020      Amazon.com, Inc. or its affiliates.  All Rights
  *                         reserved.
  *
+ * Copyright (c) 2021      Nanook Consulting.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -22,8 +23,8 @@
  * to define when it should be built.
  *
  * Each component must provide a number of types and functions that mimic
- * those provided by ORTE. These include (where flexibility exists, the
- * ORTE data type is shown, but any compatible type is allowed. For example,
+ * those provided by PRTE. These include (where flexibility exists, the
+ * pmix data type is shown, but any compatible type is allowed. For example,
  * the jobid field in ompi_process_name_t could be any type of integer, but
  * cannot be a string):
  *
@@ -68,7 +69,7 @@
  *     1. ompi_rte_collective_t - an OPAL object used during RTE collective operations
  *        such as modex and barrier. It must be an opal_list_item_t and contain the
  *        following fields:
- *           a. id (ORTE type: int32_t)
+ *           a. id (pmix type: int32_t)
  *           b. bool active
  *              flag that user can poll on to know when collective
  *              has completed - set to false just prior to
@@ -177,7 +178,6 @@ struct opal_proc_t;
 #include "opal/util/proc.h"
 #include "opal/mca/hwloc/hwloc-internal.h"
 #include "opal/mca/pmix/pmix-internal.h"
-#include "opal/dss/dss_types.h"
 
 struct ompi_proc_t;
 struct ompi_communicator_t;
@@ -194,6 +194,9 @@ OMPI_DECLSPEC extern hwloc_cpuset_t ompi_proc_applied_binding;
 
 #define OMPI_PROC_MY_NAME (&opal_process_info.my_name)
 #define OMPI_NAME_WILDCARD  (&opal_name_wildcard)
+#define OMPI_PROC_MYID (&opal_process_info.myprocid)
+#define OMPI_PRINT_ID(a) ompi_pmix_print_id(a)
+OMPI_DECLSPEC char* ompi_pmix_print_id(const pmix_proc_t *procid);
 
 typedef uint8_t ompi_rte_cmp_bitmask_t;
 #define OMPI_RTE_CMP_NONE   0x00
@@ -212,6 +215,8 @@ OMPI_DECLSPEC int ompi_rte_convert_string_to_process_name(opal_process_name_t *n
                                                           const char* name_string);
 OMPI_DECLSPEC int ompi_rte_convert_process_name_to_string(char** name_string,
                                                           const opal_process_name_t *name);
+
+OMPI_DECLSPEC void ompi_rte_breakpoint(char *name);
 
 #define OMPI_LOCAL_JOBID(n) \
     ( (n) & 0x0000ffff)

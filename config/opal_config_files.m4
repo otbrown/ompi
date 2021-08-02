@@ -1,6 +1,9 @@
 # -*- shell-script -*-
 #
 # Copyright (c) 2009-2010 Cisco Systems, Inc.  All rights reserved.
+# Copyright (c) 2020      The University of Tennessee and The University
+#                         of Tennessee Research Foundation.  All rights
+#                         reserved.
 # $COPYRIGHT$
 #
 # Additional copyrights may follow
@@ -21,9 +24,6 @@ AC_DEFUN([OPAL_CONFIG_FILES],[
         opal/mca/base/Makefile
         opal/tools/wrappers/Makefile
         opal/tools/wrappers/opalcc-wrapper-data.txt
-        opal/tools/wrappers/opalc++-wrapper-data.txt
         opal/tools/wrappers/opal.pc
-        opal/tools/opal-checkpoint/Makefile
-        opal/tools/opal-restart/Makefile
     ])
 ])
