@@ -28,12 +28,12 @@
 static inline int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                               MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
                               MPI_Datatype recvtype, struct ompi_communicator_t *comm, MPI_Info info,
-                              ompi_request_t ** request, struct mca_coll_base_module_2_3_0_t *module, bool persistent);
+                              ompi_request_t** request, struct mca_coll_base_module_2_4_0_t *module, bool persistent);
 
 int ompi_coll_libpnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                         MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
                         MPI_Datatype recvtype, struct ompi_communicator_t *comm, MPI_Info info,
-                        ompi_request_t ** request, struct mca_coll_base_module_2_3_0_t *module) {
+                        ompi_request_t** request, struct mca_coll_base_module_2_4_0_t *module) {
 
     int res = pnbc_osc_alltoallv_init(sendbuf, sendcounts, sdispls, sendtype,
                                       recvbuf, recvcounts, rdispls, recvtype,
@@ -71,8 +71,10 @@ static inline int a2av_sched_trigger_push(int crank, int csize, PNBC_OSC_Schedul
 static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                   MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
                   MPI_Datatype recvtype, struct ompi_communicator_t *comm, MPI_Info info,
-                  ompi_request_t ** request, struct mca_coll_base_module_2_3_0_t *module, bool persistent)
+                  ompi_request_t** request, struct mca_coll_base_module_2_4_0_t *module, bool persistent)
 {
+  printf("Entered pnbc_osc_alltoallv_init\n");
+  printf("pnbc_osc_alltoallv_init: *request = %p\n", *request);
   int res;
   char inplace;
   MPI_Aint sendext, recvext;
@@ -126,6 +128,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
     algo = algo_trigger_push;
   }
 
+  printf("pnbc_osc_alltoallv_init: creating dynamic window\n");
   // create a dynamic window - data here will be accessed by remote processes
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d creating dynamic window...\n",
                  crank);
@@ -137,10 +140,13 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d created dynamic window\n",
                  crank);
 
+  printf("pnbc_osc_alltoallv_init: entering switch\n");
+  
   switch (algo) {
 
     case algo_trigger_pull:
       // uses get to move data from the remote sendbuf - needs sdispls to be exchanged
+      printf("pnbc_osc_alltoallv_init: case algo_trigger_pull\n");
 
       PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d chosing linear_trigger_pull for algo choice\n",
                      crank);
@@ -248,6 +254,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
 
     case algo_trigger_push:
       // uses put to move data into the remote recvbuf - needs rdispls to be exchanged
+      printf("pnbc_osc_alltoallv_init: algo_trigger_push\n");
 
       PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d chosing linear_trigger_push for algo choice\n",
                      crank);
@@ -347,6 +354,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
       break;
 
   } // end switch (algo)
+  printf("pnbc_osc_alltoallv_init: exited switch\n");
 
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d generated schedule (end of algo switch, flags_length is %d)\n",
                      crank, schedule->flags_length);
@@ -356,6 +364,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
     return OMPI_ERROR;
   } else {
     PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Flags are at location %p with length %d (attached)\n", crank, schedule->flags, schedule->flags_length);
+    printf("pnbc_osc_alltoallv_init: attempting to attach flags to win\n\tflags_length = %d\n", schedule->flags_length);
     res = win->w_osc_module->osc_win_attach(win, schedule->flags, schedule->flags_length);
     if (OMPI_SUCCESS != res) {
       PNBC_OSC_Error ("MPI Error in flag win_attach (%i)\n", res);
@@ -367,6 +376,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d attached memory for flags\n",
                      crank);
 
+  printf("pnbc_osc_alltoallv_init: attached flags memory to the win window\n");
   // lock the flags window at all other processes
   res = MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
   if (OMPI_SUCCESS != res) {
@@ -389,6 +399,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
 //  PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d committed schedule\n",
 //                     crank);
 
+  printf("pnbc_osc_alltoallv_init: calling PNBC_OSC_Schedule_request_win\n");
   res = PNBC_OSC_Schedule_request_win(schedule, comm, win, libpnbc_osc_module, persistent, request);
   if (OPAL_UNLIKELY(OMPI_SUCCESS != res)) {
     PNBC_OSC_Error ("MPI Error in PNBC_OSC_Schedule_request_win (%i)\n", res);
@@ -405,6 +416,7 @@ static int pnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, c
     PNBC_OSC_DEBUG(10, "Window has not been free'd\n");
   }
 
+  printf("pnbc_osc_alltoallv_init: exiting\n");
   return OMPI_SUCCESS;
 }
 
@@ -487,8 +499,9 @@ static inline int a2av_sched_trigger_pull(int crank, int csize, PNBC_OSC_Schedul
 
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %d Generating pull schedule 2\n", crank);
 
-  schedule->requests = malloc(3 * csize * sizeof(MPI_Request*));
+  schedule->requests = malloc(3 * csize * sizeof(MPI_Request));
   MPI_Request *requests_rputFLAG = &(schedule->requests[0 * csize]); // circumvent the request?
+  printf("pnbc_alltoallv_init: requests_rputFLAG = %p, *requests_rputFLAG = %p\n", requests_rputFLAG, *requests_rputFLAG);
   MPI_Request *requests_moveData = &(schedule->requests[1 * csize]); // combine into PUT_NOTIFY?
   MPI_Request *requests_rputDONE = &(schedule->requests[2 * csize]); // combine into PUT_NOTIFY?
   PNBC_OSC_DEBUG(10, "[pnbc_alltoallv_init] %lu test request address %p\n",&requests_rputFLAG[0],(char*)requests_rputFLAG[0]);

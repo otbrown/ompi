@@ -110,7 +110,7 @@ ompi_coll_libpnbc_osc_component_t mca_coll_libpnbc_osc_component = {
         /* First, the mca_component_t struct containing meta information
          * about the component itself */
         .collm_version = {
-            MCA_COLL_BASE_VERSION_2_0_0,
+            MCA_COLL_BASE_VERSION_2_4_0,
 
             /* Component name and version */
             .mca_component_name = "libpnbc_osc",
@@ -393,7 +393,7 @@ libpnbc_osc_comm_query(struct ompi_communicator_t *comm,
         module->super.coll_neighbor_alltoallw_init = NULL;
     }
 
-    module->super.ft_event = NULL;
+//    module->super.ft_event = NULL;
 
     return &(module->super);
 }

@@ -39,7 +39,7 @@ BEGIN_C_DECLS
 /********************* end of LibPNBC_OSC tuning parameters ************************/
 
 struct ompi_coll_libpnbc_osc_component_t {
-    mca_coll_base_component_2_0_0_t super;
+    mca_coll_base_component_2_4_0_t super;
     opal_free_list_t requests;
     opal_list_t active_requests;
     opal_atomic_int32_t active_comms;
@@ -61,7 +61,7 @@ int ompi_coll_libpnbc_osc_progress(void);
 int ompi_coll_libpnbc_osc_alltoallv_init(const void* sendbuf, const int *sendcounts, const int *sdispls,
                         MPI_Datatype sendtype, void* recvbuf, const int *recvcounts, const int *rdispls,
                         MPI_Datatype recvtype, struct ompi_communicator_t *comm, struct ompi_info_t *,
-                        ompi_request_t ** request, struct mca_coll_base_module_2_3_0_t *module);
+                        ompi_request_t ** request, struct mca_coll_base_module_2_4_0_t *module);
 
 
 END_C_DECLS

@@ -25,27 +25,38 @@
 #include "pnbc_osc_helper_info.h"
 
 bool check_config_value_equal(char *key, ompi_info_t *info, char *value) {
-    char *value_string;
-    int value_len, ret, flag, param;
+    //char *value_string;
+    int ret, flag, param;
+    // int value_len;
     const bool *flag_value;
     bool result = false;
+    opal_cstring_t *value_string;
 
+/*
     ret = ompi_info_get_valuelen(info, key, &value_len, &flag);
     if (OMPI_SUCCESS != ret) goto info_not_found;
     if (flag == 0) goto info_not_found;
     value_len++;
+*/
 
-    value_string = (char*)malloc(sizeof(char) * value_len + 1); /* Should malloc 1 char for NUL-termination */
-    if (NULL == value_string) goto info_not_found;
+    //value_string = (char*)malloc(sizeof(char) * value_len + 1); /* Should malloc 1 char for NUL-termination */
+    //if (NULL == value_string) goto info_not_found;
 
-    ret = ompi_info_get(info, key, value_len, value_string, &flag);
+
+    //ret = ompi_info_get(info, key, value_len, value_string, &flag);
+    ret = ompi_info_get(info, key, &value_string, &flag);
     if (OMPI_SUCCESS != ret) {
-        free(value_string);
+        //free(value_string);
         goto info_not_found;
     }
+    if (flag == 0) {
+      goto info_not_found;
+    }
     assert(flag != 0);
-    if (0 == strcmp(value_string, value)) result = true;
-    free(value_string);
+    //if (0 == strcmp(value_string, value)) result = true;
+    if (0 == strcmp(value_string->string, value)) result = true;
+    //free(value_string);
+    OBJ_RELEASE(value_string);
     return result;
 
  info_not_found:
@@ -55,7 +66,8 @@ bool check_config_value_equal(char *key, ompi_info_t *info, char *value) {
     ret = mca_base_var_get_value(param, &flag_value, NULL, NULL);
     if (OMPI_SUCCESS != ret) return false;
 
-    if (0 == strcmp(value_string, value)) result = true;
+    //if (0 == strcmp(value_string, value)) result = true;
+    if (0 == strcmp(value_string->string, value)) result = true;
 
     return result;
 }
